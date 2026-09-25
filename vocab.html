@@ -1,0 +1,2641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Handwritten Flashcards</title>
+<style>
+  :root {
+    --paper: #F6F2E9;
+    --paper-dim: #EFE9DA;
+    --ink: #1F2421;
+    --ink-soft: #55605A;
+    --line: #D8CFB8;
+    --accent: #3E6259;
+    --accent-soft: #DCE7E1;
+    --danger: #A6432B;
+    --radius: 4px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #app { display: flex; flex-direction: column; height: 100%; }
+
+  header {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 22px; font-weight: 400; margin: 0;
+    letter-spacing: 0.2px;
+  }
+  header .sub { justify-self: end; font-size: 13px; color: var(--ink-soft); }
+  header:not(.home-header) { grid-template-columns: 1fr auto; }
+  header:not(.home-header) .section-tabs { display: none; }
+  .section-tabs { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper-dim); }
+  .section-tab { padding: 7px 11px; border-radius: 3px; color: var(--ink-soft); font-size: 13px; text-decoration: none; white-space: nowrap; }
+  .section-tab:hover, .section-tab:focus-visible { color: var(--accent); outline: 2px solid transparent; background: var(--accent-soft); }
+  .section-tab.active { background: var(--accent); color: var(--paper); }
+
+  main { flex: 1; overflow: hidden; position: relative; }
+  .screen { display: none; height: 100%; flex-direction: column; }
+  .screen.active { display: flex; animation: screen-in 220ms ease-out both; }
+  @keyframes screen-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* HOME */
+  #home { align-items: center; justify-content: center; padding: 28px; overflow-y: auto; }
+  .home-shell {
+    width: min(940px, 100%); display: grid; grid-template-columns: minmax(260px, 0.85fr) minmax(390px, 1.25fr);
+    border: 1px solid var(--line); border-radius: 8px; background: #FFFEF9; box-shadow: 0 14px 42px rgba(31, 36, 33, 0.07);
+  }
+  .home-overview, .home-workspace { min-width: 0; padding: clamp(24px, 4vw, 42px); }
+  .home-overview { display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--paper-dim); }
+  .home-workspace { display: flex; flex-direction: column; }
+  .home-kicker { color: var(--ink-soft); font-size: 12px; font-variant: small-caps; letter-spacing: 0.8px; }
+  .home-overview h2, .home-workspace h2 { margin: 7px 0 0; font: 400 clamp(22px, 3vw, 30px) Georgia, serif; }
+  .count { display: flex; align-items: baseline; gap: 8px; margin-top: 26px; color: var(--ink-soft); font-size: 14px; }
+  .count strong { color: var(--ink); font: 400 38px Georgia, serif; }
+  .daily-focus { margin-top: 18px; padding: 13px 14px; border-left: 3px solid var(--accent); background: var(--accent-soft); color: var(--ink-soft); font-size: 14px; line-height: 1.45; }
+  .daily-focus strong { color: var(--accent); font-weight: 600; }
+  .diagnostic-reminder { margin-top: 12px; padding: 14px; border: 1px solid #C9973F; border-radius: var(--radius); background: #FFF8E7; color: var(--ink-soft); font-size: 13px; line-height: 1.4; }
+  .diagnostic-reminder strong { display: block; margin-bottom: 3px; color: var(--ink); font: 400 17px Georgia, serif; }
+  .smart-learn-button { width: 100%; margin-top: auto; min-height: 88px; text-align: left; border-color: var(--accent); background: var(--accent); color: var(--paper); }
+  .smart-learn-button span { display: block; font: 400 20px Georgia, serif; color: var(--paper); }
+  .smart-learn-button small { display: block; margin-top: 5px; color: rgba(246, 242, 233, 0.78); font-size: 13px; line-height: 1.35; }
+  .home-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+  .home-action { min-height: 92px; text-align: left; padding: 15px 16px; border-color: var(--line); background: var(--paper); }
+  .home-action span { display: block; font: 400 18px Georgia, serif; }
+  .home-action small { display: block; margin-top: 5px; color: var(--ink-soft); font-size: 12px; line-height: 1.35; }
+  .home-library-label { margin-top: 24px; color: var(--ink-soft); font-size: 12px; font-variant: small-caps; letter-spacing: 0.8px; }
+  .home-library-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  #status { grid-column: 1 / -1; min-height: 18px; padding: 0 20px 12px; font-size: 13px; color: var(--ink-soft); text-align: center; }
+  #status.loading { display: flex; align-items: center; justify-content: center; min-height: 42px; }
+  .loading-spinner { width: 22px; height: 22px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: loading-spin 720ms linear infinite; }
+  @keyframes loading-spin { to { transform: rotate(360deg); } }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  button {
+    font-family: inherit; font-size: 16px; cursor: pointer;
+    border: 1px solid var(--ink); background: transparent; color: var(--ink);
+    border-radius: var(--radius); padding: 13px 18px;
+    transition: transform 140ms ease, background-color 160ms ease, border-color 160ms ease,
+      color 160ms ease, opacity 160ms ease;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+  button.ghost { border-color: var(--line); color: var(--ink-soft); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button.saving:disabled { display: inline-flex; align-items: center; justify-content: center; gap: 8px; opacity: 1; }
+  .save-spinner { width: 17px; height: 17px; flex: 0 0 auto; border: 2px solid rgba(246, 242, 233, 0.42); border-top-color: var(--paper); border-radius: 50%; animation: loading-spin 720ms linear infinite; }
+
+  /* CARD SCREENS (add / study / quiz) */
+  .card-top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; flex-shrink: 0; gap: 10px;
+  }
+  .card-top .label { font-size: 13px; color: var(--ink-soft); font-variant: small-caps; letter-spacing: 0.4px; }
+  .quiz-progress {
+    flex: 1; min-width: 0; height: 10px;
+    overflow: hidden; border-radius: 999px; background: var(--paper-dim);
+  }
+  .quiz-progress__bar {
+    width: 0; height: 100%; border-radius: inherit; background: var(--accent);
+    transition: width 280ms ease-out;
+  }
+  .quiz-progress[hidden] { display: none; }
+  #quiz .card-top { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+  #quiz .quiz-progress { grid-column: 2; }
+  #quiz-instruction { grid-column: 1 / -1; grid-row: 2; text-align: center; }
+  .canvas-wrap {
+    flex: 1; margin: 0 16px; border: 1px solid var(--line); border-radius: var(--radius);
+    background: #FFFEF9; position: relative; overflow: hidden; min-height: 0;
+  }
+  .canvas-wrap.card-change { animation: card-change 230ms ease-out both; }
+  @keyframes card-change {
+    from { opacity: 0.35; transform: scale(0.985); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .canvas-wrap.small { flex: none; height: 40%; }
+  canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
+
+  .toolbar {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 12px 16px; flex-shrink: 0; flex-wrap: wrap;
+  }
+  .tag-bar { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 8px 16px 0; flex-shrink: 0; }
+  .tag-bar .tag-label { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+  .tag-chip { padding: 5px 9px; font-size: 12px; white-space: nowrap; border-color: var(--line); }
+  .tag-chip.active { color: var(--paper); background: var(--accent); border-color: var(--accent); }
+  .tool-btn {
+    width: 40px; height: 40px; padding: 0; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--line); background: var(--paper-dim);
+  }
+  .tool-btn.active { border-color: var(--accent); background: var(--accent-soft); }
+  .bottom-actions {
+    display: flex; gap: 10px; padding: 12px 16px 18px; flex-shrink: 0;
+  }
+  .bottom-actions button { flex: 1; }
+
+  #quiz-compare { display: none; flex: 1; min-height: 0; margin: 0 16px 12px; gap: 10px; flex-direction: row; }
+  #quiz-compare.active { display: flex; }
+  .compare-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .compare-pane .cap { font-size: 11px; color: var(--ink-soft); font-variant: small-caps; margin-bottom: 4px; text-align: center; }
+  .compare-pane .canvas-wrap { margin: 0; flex: 1; }
+  #quiz-mode-picker { padding: 24px 16px; display: grid; gap: 10px; overflow-y: auto; }
+  .quiz-mode-button { text-align: left; padding: 16px; }
+  .quiz-mode-button small { display: block; color: var(--ink-soft); margin-top: 4px; font-size: 12px; }
+  .quiz-group-picker { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 7px; }
+  .quiz-group-heading { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--ink-soft); }
+  .quiz-select-all { padding: 5px 8px; font-size: 12px; border-color: var(--line); }
+  .quiz-group-list { display: flex; gap: 6px; flex-wrap: wrap; }
+  .quiz-group-option { display: flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; }
+  .quiz-group-option input { accent-color: var(--accent); margin: 0; }
+  .choice-count-picker { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 2px 8px; }
+  .choice-count-picker span { font-size: 13px; color: var(--ink-soft); }
+  .choice-counts { display: flex; gap: 5px; }
+  .choice-count { min-width: 36px; padding: 7px 9px; font-size: 13px; border-color: var(--line); }
+  .choice-count.active { color: var(--paper); background: var(--accent); border-color: var(--accent); }
+  .quiz-setting { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 2px 8px; }
+  .quiz-setting span { font-size: 13px; color: var(--ink-soft); }
+  .quiz-setting-options { display: flex; gap: 5px; }
+  .quiz-setting-options button { min-width: 42px; padding: 7px 9px; font-size: 13px; border-color: var(--line); }
+  .quiz-setting-options button.active { color: var(--paper); background: var(--accent); border-color: var(--accent); }
+  .quiz-question-input { width: 70px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 3px; background: #FFFEF9; color: var(--ink); font: inherit; font-size: 13px; }
+  #quiz.quiz-mode-picking .quiz-game { display: none !important; }
+  #quiz:not(.quiz-mode-picking) #quiz-mode-picker { display: none; }
+  #quiz.quiz-summary-showing .quiz-game:not(#quiz-summary) { display: none !important; }
+  #study-picker { padding: 24px 16px; display: grid; gap: 16px; overflow-y: auto; }
+  #study:not(.study-picking) #study-picker { display: none; }
+  #study.study-picking .study-game { display: none !important; }
+  #quiz-multiple-choice, #quiz-matching { display: none; flex: 1; min-height: 0; padding: 0 16px 14px; gap: 10px; }
+  #quiz-true-false { display: none; flex: 1; min-height: 0; padding: 0 16px 14px; gap: 10px; }
+  #quiz-true-false.active { display: flex; }
+  #quiz-tf-real[hidden] { display: none; }
+  .quiz-type-picker { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 7px; }
+  .quiz-type-picker > span { font-size: 13px; color: var(--ink-soft); }
+  .quiz-type-options { display: flex; flex-wrap: wrap; gap: 6px; }
+  .quiz-type-option { display: flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; }
+  .quiz-type-option input { accent-color: var(--accent); margin: 0; }
+  #quiz-actions-true-false { display: none; }
+  #quiz-actions-true-false.active { display: flex; }
+  #quiz-actions-true-false .tf-answer { min-height: 68px; padding: 18px 16px; font-size: 18px; }
+  .tf-answer.correct { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+  .tf-answer.incorrect { border-color: var(--danger); color: var(--danger); }
+  #quiz-summary { display: none; flex: 1; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+  #quiz-summary.active { display: flex; }
+  .quiz-summary-card { width: 100%; max-width: 360px; padding: 26px 20px; border: 1px solid var(--line); background: #FFFEF9; border-radius: var(--radius); }
+  .quiz-summary-card h2 { margin: 0 0 8px; font: 400 26px Georgia, serif; }
+  .quiz-summary-card p { margin: 0 0 18px; color: var(--ink-soft); }
+  .quiz-summary-actions { display: grid; gap: 8px; }
+  .confetti { font-size: 30px; letter-spacing: 6px; margin-bottom: 10px; animation: confetti-pop 500ms ease-out both; }
+  @keyframes confetti-pop { from { transform: scale(0.5) rotate(-12deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+  #quiz-multiple-choice.active { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .choice-card, .match-card {
+    min-width: 0; min-height: 0; padding: 5px; background: #FFFEF9; border: 1px solid var(--line);
+    border-radius: var(--radius); transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+  }
+  .choice-card canvas, .match-card canvas { position: static; width: 100%; height: 100%; min-height: 58px; }
+  .choice-card.selected, .match-card.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .choice-card.correct, .match-card.correct { border-color: var(--accent); background: var(--accent-soft); }
+  .choice-card.incorrect { border-color: var(--danger); background: #F5E2DC; }
+  .match-card.incorrect { border-color: var(--danger); background: #F5E2DC; }
+  #quiz-matching.active { display: flex; }
+  .match-column { flex: 1; display: grid; grid-template-rows: repeat(var(--match-count), minmax(0, 1fr)); gap: 8px; min-width: 0; }
+
+  /* LEARN */
+  #learn { overflow: hidden; }
+  #learn-picker { padding: 24px 16px; display: grid; gap: 16px; overflow-y: auto; }
+  #learn:not(.learn-picking) #learn-picker { display: none; }
+  #learn.learn-picking .learn-session { display: none !important; }
+  #learn.learn-reviewing .learn-sidebar,
+  #learn.learn-reviewing .learn-layout { display: none !important; }
+  #learn:not(.learn-reviewing) #learn-review { display: none; }
+  .learn-layout { display: flex; flex: 1; min-height: 0; padding: 0 16px 14px; }
+  .learn-question { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 10px; }
+  .learn-prompt { flex: 0 0 31%; margin: 0; }
+  .learn-answer { flex: 1; margin: 0; }
+  #learn-compare { display: none; flex: 1; min-height: 0; gap: 10px; }
+  #learn-compare.active { display: flex; }
+  #learn-choices {
+    display: none; flex: 0 1 32vh; height: min(32vh, 250px); min-height: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+  }
+  #learn-choices .choice-card { padding: 7px; }
+  #learn-choices.active { display: grid; }
+  .learn-sidebar { margin: 0 16px 10px; padding: 0 0 10px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; }
+  .learn-sidebar h2 { margin: 0; font: 400 17px Georgia, serif; white-space: nowrap; }
+  .learn-stat { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-soft); }
+  .learn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+  .learn-stat.familiar .learn-dot { background: #C48C35; }
+  .learn-stat.mastered .learn-dot { background: var(--accent); }
+  .learn-meter { height: 7px; min-width: 86px; flex: 1; overflow: hidden; border-radius: 999px; background: var(--paper-dim); display: flex; }
+  .learn-meter > span { height: 100%; transition: width 220ms ease; }
+  #learn-meter-familiar { background: #C48C35; }
+  #learn-meter-mastered { background: var(--accent); }
+  .learn-round-label { color: var(--ink-soft); font-size: 12px; white-space: nowrap; }
+  #learn-review { flex: 1; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+  #learn-review.active { display: flex; }
+  .learn-review-stats { display: flex; justify-content: center; gap: 24px; margin: 18px 0; }
+  .learn-review-stat strong { display: block; font: 400 28px Georgia, serif; }
+  .learn-review-stat span { color: var(--ink-soft); font-size: 12px; }
+  #learn-feedback { min-height: 20px; text-align: center; font-size: 13px; color: var(--ink-soft); }
+  @media (max-width: 620px) {
+    header { grid-template-columns: 1fr auto; gap: 10px; padding: 14px 16px; }
+    header .sub { justify-self: end; }
+    .section-tabs { grid-column: 1 / -1; grid-row: 2; }
+    .section-tab { flex: 1; text-align: center; }
+    .learn-sidebar { flex-wrap: wrap; gap: 6px 12px; }
+    .learn-sidebar h2 { flex-basis: 100%; }
+    .learn-meter { flex-basis: 100%; }
+    .learn-round-label { display: none; }
+    .learn-stat { grid-template-columns: 8px 1fr auto; gap: 4px; }
+    .learn-prompt { flex-basis: 28%; }
+  }
+
+  #manage-list { flex: 1; overflow-y: auto; padding: 10px 16px 16px; }
+  #manage-groups { padding: 0 16px 8px; display: flex; align-items: center; gap: 6px; overflow-x: auto; flex-shrink: 0; }
+  .manage-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .manage-row canvas { position: static; width: 70px; height: 44px; border: 1px solid var(--line); border-radius: 3px; background: #FFFEF9; }
+  .manage-row .del { border-color: var(--danger); color: var(--danger); padding: 8px 12px; font-size: 13px; margin-left: auto; }
+  .manage-row .card-tag { font-size: 11px; color: var(--accent); white-space: nowrap; }
+  .manage-row .card-group-select { max-width: 108px; padding: 7px 5px; border: 1px solid var(--line); border-radius: 3px; background: #FFFEF9; color: var(--ink); font: inherit; font-size: 12px; }
+  .empty-msg { text-align: center; color: var(--ink-soft); padding: 40px 20px; font-size: 14px; }
+  .think-popup { position: fixed; z-index: 20; left: 50%; bottom: 28px; transform: translateX(-50%); width: min(390px, calc(100% - 32px)); padding: 14px 18px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); background: #FFFEF9; box-shadow: 0 12px 36px rgba(31, 36, 33, 0.18); text-align: center; font-size: 14px; animation: popup-in 180ms ease-out both; }
+  .think-popup[hidden] { display: none; }
+  @keyframes popup-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+  /* INSIGHTS */
+  #insights { overflow: hidden; }
+  .insights-scroll { flex: 1; overflow-y: auto; padding: 4px 16px 28px; }
+  .insights-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .insight-stat { border: 1px solid var(--line); border-radius: var(--radius); background: #FFFEF9; padding: 14px; min-width: 0; }
+  .insight-stat strong { display: block; font: 400 27px Georgia, serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .insight-stat span { display: block; margin-top: 3px; color: var(--ink-soft); font-size: 11px; }
+  .insight-section { margin-top: 20px; }
+  .insight-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+  .insight-section h2 { margin: 0; font: 400 19px Georgia, serif; }
+  .insight-note { color: var(--ink-soft); font-size: 11px; }
+  .insight-empty { padding: 22px 14px; border: 1px dashed var(--line); color: var(--ink-soft); text-align: center; font-size: 13px; }
+  .activity-chart { height: 126px; display: flex; align-items: stretch; gap: 5px; border-bottom: 1px solid var(--line); padding: 8px 4px 0; }
+  .activity-day { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+  .activity-bars { width: 100%; max-width: 22px; height: 88px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; border-radius: 2px 2px 0 0; background: var(--paper-dim); }
+  .activity-bars span { display: block; width: 100%; }
+  .activity-bars .right { background: var(--accent); }
+  .activity-bars .wrong { background: #D7A093; }
+  .activity-day label { color: var(--ink-soft); font-size: 9px; white-space: nowrap; }
+  .deck-row { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(130px, 2fr) auto; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .deck-row:last-child { border-bottom: 0; }
+  .deck-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .accuracy-track { height: 8px; border-radius: 999px; overflow: hidden; background: var(--paper-dim); }
+  .accuracy-track span { display: block; height: 100%; background: var(--accent); }
+  .deck-score { color: var(--ink-soft); font-size: 12px; white-space: nowrap; text-align: right; }
+  .trouble-list { display: grid; gap: 8px; }
+  .trouble-card { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px; border: 1px solid var(--line); border-radius: var(--radius); background: #FFFEF9; }
+  .trouble-card canvas { position: static; width: 92px; height: 54px; border: 1px solid var(--line); border-radius: 3px; background: white; }
+  .trouble-card strong { display: block; font: 400 15px Georgia, serif; }
+  .trouble-card span { color: var(--ink-soft); font-size: 11px; }
+  .trouble-rate { color: var(--danger); font: 400 20px Georgia, serif; text-align: right; }
+  .trouble-rate small { display: block; color: var(--ink-soft); font: 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  .insight-callout { padding: 13px 15px; background: var(--accent-soft); border-left: 3px solid var(--accent); font-size: 13px; line-height: 1.45; }
+  @media (max-width: 620px) {
+    #home { justify-content: flex-start; padding: 14px; }
+    .home-shell { grid-template-columns: 1fr; }
+    .home-overview { border-right: 0; border-bottom: 1px solid var(--line); }
+    .home-overview, .home-workspace { padding: 22px; }
+    .smart-learn-button { margin-top: 22px; }
+    .insights-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .deck-row { grid-template-columns: minmax(80px, 1fr) minmax(80px, 1.3fr) auto; }
+    .trouble-card { grid-template-columns: 76px minmax(0, 1fr) auto; gap: 8px; }
+    .trouble-card canvas { width: 76px; height: 48px; }
+    .activity-day:nth-child(even) label { visibility: hidden; }
+  }
+  @media (max-height: 650px) {
+    #home { justify-content: flex-start; padding-top: 14px; }
+    .home-overview, .home-workspace { padding-top: 20px; padding-bottom: 20px; }
+    .home-action { min-height: 78px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="app-header" class="home-header">
+    <h1>Flashcards</h1>
+    <nav class="section-tabs" aria-label="Vocabulary sections">
+      <a class="section-tab active" href="vocab.html" aria-current="page">Vocab Flashcards</a>
+      <a class="section-tab" href="ssat_practice.html">SSAT Practice</a>
+    </nav>
+    <span class="sub" id="header-sub"></span>
+  </header>
+  <main>
+
+    <!-- HOME -->
+    <section id="home" class="screen active">
+      <div class="home-shell">
+        <section class="home-overview" aria-labelledby="home-overview-title">
+          <div class="home-kicker">Your library</div>
+          <h2 id="home-overview-title">Ready to review</h2>
+          <div class="count"><strong id="card-count">0</strong><span>cards saved</span></div>
+          <div class="daily-focus" id="daily-focus" hidden>Today, focus on reviewing <strong id="daily-focus-set"></strong>.</div>
+          <div class="diagnostic-reminder" id="diagnostic-reminder" hidden>
+            <strong>Time for a diagnostic test</strong>
+            In Quiz me, select all sets, choose Write your answer, and answer every card to recalibrate Smart Learn.
+          </div>
+          <button class="smart-learn-button" id="btn-smart-learn"><span>Smart Learn</span><small>Automatically practice what needs work.</small></button>
+        </section>
+        <section class="home-workspace" aria-labelledby="home-practice-title">
+          <div class="home-kicker">Practice</div>
+          <h2 id="home-practice-title">Choose a session</h2>
+          <div class="home-action-grid">
+            <button class="home-action" id="btn-study"><span>Study</span><small>Browse cards at your pace.</small></button>
+            <button class="home-action" id="btn-learn"><span>Learn</span><small>Build mastery in rounds.</small></button>
+            <button class="home-action" id="btn-quiz"><span>Quiz me</span><small>Test recall in mixed formats.</small></button>
+            <button class="home-action" id="btn-insights"><span>Insights</span><small>See patterns and weak spots.</small></button>
+          </div>
+          <div class="home-library-label">Library</div>
+          <div class="home-library-actions">
+            <button class="primary" id="btn-add">Add a card</button>
+            <button class="ghost" id="btn-manage">Manage cards</button>
+          </div>
+        </section>
+        <div id="status" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- ADD CARD -->
+    <section id="add" class="screen">
+      <div class="card-top">
+        <button class="ghost" id="add-cancel">Cancel</button>
+        <span class="label" id="add-side-label">Front</span>
+        <span style="width:70px"></span>
+      </div>
+      <div class="canvas-wrap"><canvas id="add-canvas"></canvas></div>
+      <div class="tag-bar" id="add-tag-bar"></div>
+      <div class="toolbar" id="add-toolbar"></div>
+      <div id="add-debug" style="text-align:center;font-size:11px;color:var(--ink-soft);padding:0 16px 6px;min-height:14px;"></div>
+      <div id="add-debug-counts" style="text-align:center;font-size:11px;color:var(--ink-soft);padding:0 16px 2px;min-height:14px;"></div>
+      <div style="text-align:center;padding:0 16px 6px;"><button class="ghost" id="reset-debug-counts" style="padding:4px 10px;font-size:11px;">Reset counts</button></div>
+      <div class="bottom-actions">
+        <button class="ghost" id="add-clear">Clear</button>
+        <button class="ghost" id="add-edit-front" hidden>&larr; Edit front</button>
+        <button class="primary" id="add-next">Next: back &rarr;</button>
+      </div>
+    </section>
+
+    <!-- STUDY -->
+    <section id="study" class="screen">
+      <div class="card-top">
+        <button class="ghost" id="study-exit">Done</button>
+        <span class="label" id="study-progress"></span>
+        <span class="label" id="study-side">Front</span>
+      </div>
+      <div id="study-picker">
+        <div class="quiz-group-picker">
+          <div class="quiz-group-heading"><span>Sets to study</span><button class="quiz-select-all" id="study-select-all">Deselect all</button></div>
+          <div class="quiz-group-list" id="study-group-list"></div>
+        </div>
+        <button class="quiz-mode-button primary" id="study-start">Start studying<small>Review only the sets you selected.</small></button>
+      </div>
+      <div class="canvas-wrap study-game"><canvas id="study-canvas"></canvas></div>
+      <div class="bottom-actions study-game">
+        <button id="study-prev">&larr; Prev</button>
+        <button class="primary" id="study-flip">Flip</button>
+        <button id="study-next">Next &rarr;</button>
+      </div>
+    </section>
+
+    <!-- QUIZ -->
+    <section id="quiz" class="screen">
+      <div class="card-top">
+        <button class="ghost" id="quiz-exit">Done</button>
+        <div class="quiz-progress" id="quiz-progress" role="progressbar" aria-label="Quiz progress" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" hidden>
+          <div class="quiz-progress__bar" id="quiz-progress-bar"></div>
+        </div>
+        <span class="label" id="quiz-instruction">Choose a quiz mode</span>
+      </div>
+      <div id="quiz-mode-picker">
+        <div class="quiz-group-picker">
+          <div class="quiz-group-heading"><span>Groups to review</span><button class="quiz-select-all" id="quiz-select-all">Deselect all</button></div>
+          <div class="quiz-group-list" id="quiz-group-list"></div>
+        </div>
+        <button class="quiz-mode-button" data-quiz-mode="write">Write your answer<small>Recall the answer with your stylus.</small></button>
+        <button class="quiz-mode-button" data-quiz-mode="choice">Multiple choice<small>Pick the matching handwritten answer.</small></button>
+        <button class="quiz-mode-button" data-quiz-mode="truefalse">True or false<small>Decide whether a word and definition belong together.</small></button>
+        <div class="choice-count-picker">
+          <span>Choices per question</span>
+          <div class="choice-counts" role="group" aria-label="Number of multiple-choice answers">
+            <button class="choice-count" data-choice-count="2">2</button>
+            <button class="choice-count" data-choice-count="3">3</button>
+            <button class="choice-count active" data-choice-count="4">4</button>
+          </div>
+        </div>
+        <div class="quiz-setting">
+          <span>Questions</span>
+          <div class="quiz-setting-options" role="group" aria-label="Number of quiz questions">
+            <input class="quiz-question-input" id="quiz-question-input" type="number" min="1" step="1" inputmode="numeric" placeholder="#" aria-label="Number of quiz questions">
+            <button class="active" data-question-count="infinite" title="Infinite questions">∞</button>
+          </div>
+        </div>
+        <button class="quiz-mode-button" data-quiz-mode="match">Matching<small>Match fronts to their answers.</small></button>
+        <button class="quiz-mode-button primary" data-quiz-mode="mixed">Mixed<small>A surprise rotation of all question types.</small></button>
+        <div class="quiz-type-picker">
+          <span>Custom mix</span>
+          <div class="quiz-type-options" id="quiz-type-options">
+            <label class="quiz-type-option"><input type="checkbox" value="write" checked> Write</label>
+            <label class="quiz-type-option"><input type="checkbox" value="choice" checked> Choice</label>
+            <label class="quiz-type-option"><input type="checkbox" value="truefalse" checked> True/False</label>
+            <label class="quiz-type-option"><input type="checkbox" value="match" checked> Matching</label>
+          </div>
+          <button class="quiz-mode-button" id="quiz-start-custom">Start custom mix</button>
+        </div>
+      </div>
+      <div class="canvas-wrap small quiz-game"><canvas id="quiz-front-canvas"></canvas></div>
+      <div class="canvas-wrap quiz-game" id="quiz-answer-wrap"><canvas id="quiz-answer-canvas"></canvas></div>
+      <div id="quiz-compare" class="quiz-game">
+        <div class="compare-pane">
+          <div class="cap">Your answer</div>
+          <div class="canvas-wrap"><canvas id="quiz-your-canvas"></canvas></div>
+        </div>
+        <div class="compare-pane">
+          <div class="cap">Actual answer</div>
+          <div class="canvas-wrap"><canvas id="quiz-real-canvas"></canvas></div>
+        </div>
+      </div>
+      <div id="quiz-multiple-choice" class="quiz-game"></div>
+      <div id="quiz-matching" class="quiz-game"></div>
+      <div id="quiz-true-false" class="quiz-game">
+        <div class="compare-pane"><div class="cap">Word</div><div class="canvas-wrap"><canvas id="quiz-tf-front-canvas"></canvas></div></div>
+        <div class="compare-pane"><div class="cap">Displayed definition</div><div class="canvas-wrap"><canvas id="quiz-tf-definition-canvas"></canvas></div></div>
+        <div class="compare-pane" id="quiz-tf-real" hidden><div class="cap">Real definition</div><div class="canvas-wrap"><canvas id="quiz-tf-real-canvas"></canvas></div></div>
+      </div>
+      <div id="quiz-summary" class="quiz-game"></div>
+      <div class="toolbar quiz-game" id="quiz-toolbar"></div>
+      <div class="bottom-actions quiz-game" id="quiz-actions-write">
+        <button class="ghost" id="quiz-clear">Clear</button>
+        <button class="primary" id="quiz-reveal">Reveal answer</button>
+      </div>
+      <div class="bottom-actions quiz-game" id="quiz-actions-reveal" style="display:none">
+        <button class="ghost" id="quiz-mark-wrong" hidden>Mark wrong</button>
+        <button class="primary" id="quiz-mark-right" hidden>Mark right</button>
+        <button id="quiz-again">Again</button>
+        <button class="primary" id="quiz-next">Next &rarr;</button>
+      </div>
+      <div class="bottom-actions quiz-game" id="quiz-actions-true-false">
+        <button class="tf-answer" id="quiz-tf-false">False</button>
+        <button class="tf-answer" id="quiz-tf-true">True</button>
+      </div>
+    </section>
+
+    <!-- LEARN -->
+    <section id="learn" class="screen learn-picking">
+      <div class="card-top">
+        <button class="ghost" id="learn-exit">Done</button>
+        <span class="label" id="learn-progress"></span>
+        <span class="label" id="learn-instruction">Set up Learn</span>
+      </div>
+      <div id="learn-picker">
+        <div class="quiz-group-picker">
+          <div class="quiz-group-heading"><span>Groups to learn</span><button class="quiz-select-all" id="learn-select-all">Deselect all</button></div>
+          <div class="quiz-group-list" id="learn-group-list"></div>
+        </div>
+        <button class="quiz-mode-button primary" id="learn-start">Start learning<small>Build familiarity with choices, then handwrite answers from memory.</small></button>
+      </div>
+      <aside class="learn-sidebar learn-session" aria-label="Learning progress">
+        <div class="learn-meter"><span id="learn-meter-familiar"></span><span id="learn-meter-mastered"></span></div>
+        <div class="learn-stat not-studied"><span class="learn-dot"></span><span>Not studied</span><strong id="learn-count-new">0</strong></div>
+        <div class="learn-stat familiar"><span class="learn-dot"></span><span>Familiar</span><strong id="learn-count-familiar">0</strong></div>
+        <div class="learn-stat mastered"><span class="learn-dot"></span><span>Mastered</span><strong id="learn-count-mastered">0</strong></div>
+        <div class="learn-round-label" id="learn-round-label"></div>
+      </aside>
+      <div class="learn-layout learn-session">
+        <div class="learn-question">
+          <div class="canvas-wrap learn-prompt"><canvas id="learn-front-canvas"></canvas></div>
+          <div class="canvas-wrap learn-answer" id="learn-answer-wrap"><canvas id="learn-answer-canvas"></canvas></div>
+          <div id="learn-compare">
+            <div class="compare-pane"><div class="cap">Your answer</div><div class="canvas-wrap"><canvas id="learn-your-canvas"></canvas></div></div>
+            <div class="compare-pane"><div class="cap">Actual answer</div><div class="canvas-wrap"><canvas id="learn-real-canvas"></canvas></div></div>
+          </div>
+          <div id="learn-choices"></div>
+          <div id="learn-feedback"></div>
+          <div class="toolbar" id="learn-toolbar"></div>
+          <div class="bottom-actions" id="learn-actions-write">
+            <button class="ghost" id="learn-clear">Clear</button>
+            <button class="primary" id="learn-reveal">Reveal answer</button>
+          </div>
+          <div class="bottom-actions" id="learn-actions-grade" style="display:none">
+            <button class="ghost" id="learn-mark-wrong">Mark wrong</button>
+            <button class="primary" id="learn-mark-right">Mark right</button>
+          </div>
+          <div class="bottom-actions" id="learn-actions-next" style="display:none">
+            <button class="primary" id="learn-next">Continue</button>
+          </div>
+        </div>
+      </div>
+      <div id="learn-review" class="learn-session"></div>
+    </section>
+
+    <!-- INSIGHTS -->
+    <section id="insights" class="screen">
+      <div class="card-top">
+        <button class="ghost" id="insights-back">&larr; Back</button>
+        <span class="label">Your progress</span>
+        <span style="width:70px"></span>
+      </div>
+      <div class="insights-scroll" id="insights-content"></div>
+    </section>
+
+    <!-- MANAGE -->
+    <section id="manage" class="screen">
+      <div class="card-top">
+        <button class="ghost" id="manage-back">&larr; Back</button>
+        <span class="label">All cards</span>
+        <span style="width:70px"></span>
+      </div>
+      <div id="manage-groups"></div>
+      <div id="manage-list"></div>
+    </section>
+
+  </main>
+  <div class="think-popup" id="think-popup" role="status" aria-live="polite" hidden>Give it another think before you submit</div>
+</div>
+
+<script>
+// ---------- Supabase config ----------
+const SUPABASE_URL = "https://hgnxognueurgcxfqvmro.supabase.co";
+const SUPABASE_KEY = "sb_publishable__R0omP5AoN2Zu2jaQ818sg_cVgJ2MbQ";
+const REST = SUPABASE_URL + "/rest/v1/flashcards";
+const ANALYTICS_REST = SUPABASE_URL + "/rest/v1/flashcard_analytics";
+const DIAGNOSTIC_REST = SUPABASE_URL + "/rest/v1/flashcard_diagnostics";
+const HEADERS = {
+  "apikey": SUPABASE_KEY,
+  "Authorization": "Bearer " + SUPABASE_KEY,
+  "Content-Type": "application/json"
+};
+
+async function fetchCards() {
+  const res = await fetch(REST + "?select=*&order=created_at.desc", { headers: HEADERS });
+  if (!res.ok) throw new Error("Failed to load cards");
+  return res.json();
+}
+async function insertCard(front, back, deck) {
+  const res = await fetch(REST, {
+    method: "POST",
+    headers: { ...HEADERS, "Prefer": "return=representation" },
+    body: JSON.stringify([{ front_strokes: front, back_strokes: back, deck: deck || null }])
+  });
+  if (!res.ok) throw new Error("Failed to save card");
+  return res.json();
+}
+async function deleteCard(id) {
+  const res = await fetch(REST + "?id=eq." + id, { method: "DELETE", headers: HEADERS });
+  if (!res.ok) throw new Error("Failed to delete card");
+}
+async function updateCardDeck(id, deck) {
+  const res = await fetch(REST + "?id=eq." + id, {
+    method: "PATCH",
+    headers: { ...HEADERS, "Prefer": "return=minimal" },
+    body: JSON.stringify({ deck: deck || null })
+  });
+  if (!res.ok) throw new Error("Failed to update card group");
+}
+
+// ---------- Stroke canvas engine ----------
+// Strokes stored in normalized [0,1] coordinates so they scale to any canvas size.
+class StrokeCanvas {
+  constructor(canvasEl, opts = {}) {
+    this.canvas = canvasEl;
+    this.ctx = canvasEl.getContext("2d");
+    this.strokes = [];
+    this.currentStroke = null;
+    this.tool = "pen";
+    this.readOnly = !!opts.readOnly;
+    this.penColor = opts.penColor || "#1F2421";
+    // WebKit exposes Apple Pencil separately from direct finger touches. On
+    // supported iPads, prefer that independent event stream over Pointer Events.
+    this.useStylusTouchEvents = !!(window.Touch && "touchType" in window.Touch.prototype);
+    // Finished strokes are cached to an offscreen bitmap so a redraw during an
+    // active stroke only has to re-render that one stroke, not the card's
+    // entire history. Redrawing everything on every pointermove gets slower as
+    // a card fills up, and that lost headroom is what starts dropping fast,
+    // short strokes first.
+    this._base = document.createElement("canvas");
+    this._baseCtx = this._base.getContext("2d");
+    this._resizeObserver = new ResizeObserver(() => this._resize());
+    this._resizeObserver.observe(this.canvas.parentElement);
+    this._resize();
+    if (!this.readOnly) this._bindEvents();
+  }
+  _resize() {
+    const rect = this.canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = Math.max(1, rect.width * dpr);
+    this.canvas.height = Math.max(1, rect.height * dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this._base.width = this.canvas.width;
+    this._base.height = this.canvas.height;
+    this._baseCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.w = rect.width; this.h = rect.height;
+    this._rebuildBase();
+  }
+  _rebuildBase() {
+    this._drawStrokes(this._baseCtx, this.strokes, { clear: true });
+    this.redraw();
+  }
+  _appendStrokeToBase(stroke) {
+    this._drawStrokes(this._baseCtx, [stroke], { clear: false });
+    this.redraw();
+  }
+  _drawStrokes(ctx, strokes, opts = {}) {
+    if (opts.clear !== false) ctx.clearRect(0, 0, this.w, this.h);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = this.penColor;
+    for (const s of strokes) {
+      ctx.lineWidth = s.width || 2.4;
+      if (s.points.length === 1) {
+        const p = this._toPixel(s.points[0]);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+        ctx.fillStyle = this.penColor;
+        ctx.fill();
+        continue;
+      }
+      ctx.beginPath();
+      const p0 = this._toPixel(s.points[0]);
+      ctx.moveTo(p0.x, p0.y);
+      for (let i = 1; i < s.points.length; i++) {
+        const p = this._toPixel(s.points[i]);
+        ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+  }
+  _toNorm(x, y) { return { x: x / this.w, y: y / this.h }; }
+  _toPixel(pt) { return { x: pt.x * this.w, y: pt.y * this.h }; }
+  _bindEvents() {
+    const el = this.canvas;
+    el.addEventListener("pointerdown", (e) => this._down(e));
+    el.addEventListener("pointermove", (e) => this._move(e));
+    // Some stylus drivers deliver rapid samples here more reliably than through
+    // pointermove. The pointer-ID guard keeps mouse/touch input unaffected.
+    el.addEventListener("pointerrawupdate", (e) => this._move(e));
+    el.addEventListener("pointerup", (e) => this._up(e));
+    el.addEventListener("pointercancel", (e) => this._up(e));
+    // Pen lifts can occasionally be delivered after capture has been released,
+    // particularly during rapid handwriting. Listen outside the canvas as a
+    // fallback; _up's pointer-ID check makes a duplicate event a no-op.
+    el.addEventListener("lostpointercapture", (e) => this._up(e));
+    window.addEventListener("pointerup", (e) => this._up(e));
+    window.addEventListener("pointercancel", (e) => this._up(e));
+    if (this.useStylusTouchEvents) {
+      el.addEventListener("touchstart", (e) => this._touchStart(e), { passive: false });
+      el.addEventListener("touchmove", (e) => this._touchMove(e), { passive: false });
+      window.addEventListener("touchend", (e) => this._touchEnd(e), { passive: false });
+      window.addEventListener("touchcancel", (e) => this._touchEnd(e), { passive: false });
+    }
+  }
+  _stylusTouches(event) {
+    return [...event.changedTouches].filter(touch => touch.touchType === "stylus");
+  }
+  _touchAsPointer(touch, event) {
+    return {
+      pointerId: `stylus-${touch.identifier}`,
+      pointerType: "pen",
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      pressure: touch.force || 0.5,
+      buttons: 1,
+      timeStamp: event.timeStamp,
+      fromStylusTouch: true,
+      preventDefault: () => event.preventDefault()
+    };
+  }
+  _touchStart(event) {
+    const touch = this._stylusTouches(event)[0];
+    if (touch) this._down(this._touchAsPointer(touch, event));
+  }
+  _touchMove(event) {
+    const touch = this._stylusTouches(event).find(item => `stylus-${item.identifier}` === this.activePointerId);
+    if (touch) this._move(this._touchAsPointer(touch, event));
+  }
+  _touchEnd(event) {
+    const touch = this._stylusTouches(event).find(item => `stylus-${item.identifier}` === this.activePointerId);
+    if (touch) this._up(this._touchAsPointer(touch, event));
+  }
+  _localXY(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+  _down(e) {
+    // A resting palm is reported as a touch pointer while a stylus is a pen.
+    // Ignore touch entirely so it cannot start or interfere with a pen stroke.
+    if (e.pointerType === "touch" || (e.pointerType === "mouse" && e.button !== 0)) return;
+    const inputSource = e.fromStylusTouch ? "stylus-touch" : "pointer";
+    // Pointer and Touch Events may both describe the same Pencil contact. If
+    // Touch Events arrive just after pointerdown, discard that provisional
+    // pointer stroke and let the preferred stylus stream take over. Conversely,
+    // a later pointerdown can recover automatically from a stalled touch stream.
+    if (inputSource === "pointer" && this.activeInputSource === "stylus-touch"
+        && e.timeStamp - this.activeInputStartedAt < 80) return;
+    if (inputSource === "stylus-touch" && this.activeInputSource === "pointer") {
+      this._discardActiveStroke();
+    }
+    e.preventDefault();
+    // If the browser missed a previous pen-lift event, commit that stroke now
+    // instead of overwriting it when the next quick stroke begins. A single
+    // stylus commonly reuses the same pointerId across strokes in a session,
+    // so this must fire even when the new pointerId matches the stale one —
+    // checking for a *different* id let same-id reuse silently discard the
+    // previous (often short, fast) stroke whenever its pointerup was missed.
+    if (this.activePointerId != null) this._finishActiveStroke();
+    if (!e.fromStylusTouch) {
+      try { this.canvas.setPointerCapture(e.pointerId); } catch (_) { /* capture is a best-effort safeguard */ }
+    }
+    this.activePointerId = e.pointerId;
+    this.activeInputSource = inputSource;
+    this.activeInputStartedAt = e.timeStamp;
+    const { x, y } = this._localXY(e);
+    if (this.tool === "pen") {
+      this.currentStroke = { points: [{ ...this._toNorm(x, y), p: e.pressure || 0.5, t: e.timeStamp }], width: 2.4 };
+      this.drawing = true;
+    } else {
+      this.erasing = true;
+      this._eraseNear(x, y);
+    }
+  }
+  _move(e) {
+    // Self-heal: on iPad Safari, a very brief, very small Apple Pencil
+    // contact sometimes never dispatches pointerdown at all (likely tied to
+    // how Safari disambiguates real contact from Pencil hover-detection),
+    // even though pointermove samples for that same contact still arrive.
+    // If we see pen movement while nothing is currently being tracked,
+    // treat it as an implicit stroke start rather than losing it outright.
+    if (this.tool === "pen" && !this.drawing && !this.erasing
+        && e.pointerType === "pen" && (e.pressure > 0 || e.buttons > 0)) {
+      this.activePointerId = e.pointerId;
+      this.activeInputSource = e.fromStylusTouch ? "stylus-touch" : "pointer";
+      this.activeInputStartedAt = e.timeStamp;
+      try { this.canvas.setPointerCapture(e.pointerId); } catch (_) { /* best-effort */ }
+      const { x, y } = this._localXY(e);
+      this.currentStroke = { points: [{ ...this._toNorm(x, y), p: e.pressure || 0.5, t: e.timeStamp }], width: 2.4 };
+      this.drawing = true;
+    }
+    if (e.pointerId !== this.activePointerId || (!this.drawing && !this.erasing)) return;
+    e.preventDefault();
+    if (this.tool === "pen" && this.drawing) {
+      // Browsers can batch fast stylus samples into a single pointer event.
+      // Keeping those samples makes small handwriting substantially more reliable.
+      const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+      const samples = coalesced.length ? coalesced : [e];
+      samples.forEach(sample => {
+        const { x, y } = this._localXY(sample);
+        const point = { ...this._toNorm(x, y), p: sample.pressure || 0.5, t: sample.timeStamp };
+        const last = this.currentStroke.points[this.currentStroke.points.length - 1];
+        if (!last || Math.hypot(last.x - point.x, last.y - point.y) > 0.00001) this.currentStroke.points.push(point);
+      });
+      this.redraw();
+    } else if (this.erasing) {
+      const { x, y } = this._localXY(e);
+      this._eraseNear(x, y);
+    }
+  }
+  _up(e) {
+    if (e.pointerId !== this.activePointerId) return;
+    // A quick pen stroke can begin and end between pointermove deliveries.
+    // Save the final coordinate so its last segment is never dropped.
+    if (this.drawing && this.currentStroke) {
+      const { x, y } = this._localXY(e);
+      const point = { ...this._toNorm(x, y), p: e.pressure || 0.5, t: e.timeStamp };
+      const last = this.currentStroke.points[this.currentStroke.points.length - 1];
+      if (!last || Math.hypot(last.x - point.x, last.y - point.y) > 0.0001) this.currentStroke.points.push(point);
+    }
+    this._finishActiveStroke();
+  }
+  _discardActiveStroke() {
+    this.currentStroke = null;
+    this.drawing = false;
+    this.erasing = false;
+    this.activePointerId = null;
+    this.activeInputSource = null;
+    this.activeInputStartedAt = null;
+    this.redraw();
+  }
+  _finishActiveStroke() {
+    const hadStroke = this.drawing && this.currentStroke;
+    const finished = hadStroke ? this.currentStroke : null;
+    if (hadStroke) this.strokes.push(this.currentStroke);
+    this.currentStroke = null;
+    this.drawing = false;
+    this.erasing = false;
+    this.activePointerId = null;
+    this.activeInputSource = null;
+    this.activeInputStartedAt = null;
+    // Normal writing only adds ink, so append the new stroke to the cached
+    // bitmap. Rebuilding all prior strokes is reserved for erase/resize/load.
+    if (hadStroke) this._appendStrokeToBase(finished); else this.redraw();
+    if (finished && this.onStrokeComplete) this.onStrokeComplete(finished);
+  }
+  _eraseNear(x, y) {
+    const nx = x / this.w, ny = y / this.h;
+    const thresh = 22 / Math.min(this.w, this.h);
+    const before = this.strokes.length;
+    this.strokes = this.strokes.filter(s => !s.points.some(pt => Math.hypot(pt.x - nx, pt.y - ny) < thresh));
+    if (this.strokes.length !== before) this._rebuildBase();
+  }
+  redraw() {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.drawImage(this._base, 0, 0);
+    ctx.restore();
+    if (this.currentStroke) this._drawStrokes(ctx, [this.currentStroke], { clear: false });
+  }
+  setTool(t) { this.tool = t; }
+  clear() { this.strokes = []; this._rebuildBase(); }
+  loadStrokes(strokes) { this.strokes = strokes || []; this._rebuildBase(); }
+  getStrokes() { return this.strokes; }
+}
+
+function toolbarHTML(prefix) {
+  return `
+    <button class="tool-btn active" data-tool="pen" data-prefix="${prefix}" title="Pen">&#x270E;</button>
+    <button class="tool-btn" data-tool="eraser" data-prefix="${prefix}" title="Eraser">&#x2B1B;</button>
+  `;
+}
+function wireToolbar(container, sc) {
+  container.querySelectorAll(".tool-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      container.querySelectorAll(".tool-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      sc.setTool(btn.dataset.tool);
+    });
+  });
+}
+
+// ---------- App state / screens ----------
+const screens = {};
+document.querySelectorAll(".screen").forEach(s => screens[s.id] = s);
+function showScreen(id) {
+  Object.values(screens).forEach(s => s.classList.remove("active"));
+  screens[id].classList.add("active");
+  document.getElementById("app-header").classList.toggle("home-header", id === "home");
+  if (id === "home") renderDailyFocus();
+}
+function animateCardChange(canvas) {
+  const wrap = canvas.closest(".canvas-wrap");
+  if (!wrap) return;
+  wrap.classList.remove("card-change");
+  // Restart the animation when moving between cards or card sides.
+  requestAnimationFrame(() => wrap.classList.add("card-change"));
+}
+function setStatus(msg, isError) {
+  const el = document.getElementById("status");
+  const isLoading = msg === "Loading\u2026";
+  el.classList.toggle("loading", isLoading);
+  el.setAttribute("aria-busy", String(isLoading));
+  if (isLoading) {
+    el.innerHTML = `<span class="loading-spinner" aria-hidden="true"></span><span class="sr-only">Loading cards</span>`;
+  } else {
+    el.textContent = msg;
+  }
+  el.style.color = isError ? "var(--danger)" : "var(--ink-soft)";
+}
+
+let cards = [];
+
+// ---- Persistent learning analytics ----
+// Cards live in Supabase, while private practice history stays in this browser.
+// The versioned envelope leaves room for a future account-sync migration.
+const ANALYTICS_KEY = "flashcardAnalyticsV1";
+const ANALYTICS_DEVICE_KEY = "flashcardAnalyticsDeviceId";
+const DIAGNOSTIC_LOCAL_KEY = "flashcardLastDiagnosticAt";
+const DIAGNOSTIC_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+let analyticsData = loadAnalytics();
+let activeQuizSessionId = null;
+let activeLearnSessionId = null;
+let analyticsSyncTimer = null;
+let analyticsSyncInFlight = null;
+let analyticsSyncQueued = false;
+let analyticsCloudAvailable = true;
+const analyticsDeviceId = loadAnalyticsDeviceId();
+let lastDiagnosticAt = loadLocalDiagnosticDate();
+let currentQuizQualifiesAsDiagnostic = false;
+
+function loadLocalDiagnosticDate() {
+  try { return localStorage.getItem(DIAGNOSTIC_LOCAL_KEY); } catch (_) { return null; }
+}
+function diagnosticIsDue() {
+  const completed = lastDiagnosticAt ? new Date(lastDiagnosticAt).getTime() : 0;
+  return !completed || Date.now() - completed >= DIAGNOSTIC_INTERVAL_MS;
+}
+function renderDiagnosticReminder() {
+  document.getElementById("diagnostic-reminder").hidden = cards.length === 0 || !diagnosticIsDue();
+}
+async function uploadDiagnosticDate(date) {
+  const response = await fetch(`${DIAGNOSTIC_REST}?on_conflict=device_id`, {
+    method: "POST",
+    headers: { ...HEADERS, "Prefer": "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([{ device_id: analyticsDeviceId, last_completed_at: date, updated_at: date }])
+  });
+  if (!response.ok) throw new Error(`Diagnostic status upload failed (${response.status})`);
+}
+async function syncDiagnosticStatus() {
+  try {
+    const response = await fetch(`${DIAGNOSTIC_REST}?device_id=eq.${encodeURIComponent(analyticsDeviceId)}&select=last_completed_at&limit=1`, { headers: HEADERS });
+    if (!response.ok) throw new Error(`Diagnostic status download failed (${response.status})`);
+    const row = (await response.json())[0];
+    if (row?.last_completed_at && (!lastDiagnosticAt || new Date(row.last_completed_at) > new Date(lastDiagnosticAt))) {
+      lastDiagnosticAt = row.last_completed_at;
+      try { localStorage.setItem(DIAGNOSTIC_LOCAL_KEY, lastDiagnosticAt); } catch (_) { /* Cloud remains authoritative. */ }
+    } else if (lastDiagnosticAt && (!row?.last_completed_at || new Date(lastDiagnosticAt) > new Date(row.last_completed_at))) {
+      await uploadDiagnosticDate(lastDiagnosticAt);
+    }
+  } catch (err) {
+    console.warn(err.message);
+  }
+  renderDiagnosticReminder();
+}
+async function recordDiagnosticCompletion() {
+  lastDiagnosticAt = new Date().toISOString();
+  try { localStorage.setItem(DIAGNOSTIC_LOCAL_KEY, lastDiagnosticAt); } catch (_) { /* Continue with cloud sync. */ }
+  renderDiagnosticReminder();
+  try {
+    await uploadDiagnosticDate(lastDiagnosticAt);
+  } catch (err) {
+    console.warn(err.message);
+  }
+}
+function loadAnalyticsDeviceId() {
+  try {
+    const existing = localStorage.getItem(ANALYTICS_DEVICE_KEY);
+    if (existing) return existing;
+    const created = typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : analyticsId("device");
+    localStorage.setItem(ANALYTICS_DEVICE_KEY, created);
+    return created;
+  } catch (_) {
+    return analyticsId("device");
+  }
+}
+
+function loadAnalytics() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(ANALYTICS_KEY));
+    if (parsed && parsed.version === 1 && Array.isArray(parsed.attempts) && Array.isArray(parsed.sessions)) return parsed;
+  } catch (_) { /* Start fresh if storage is unavailable or malformed. */ }
+  return { version: 1, attempts: [], sessions: [] };
+}
+function saveAnalytics(syncToCloud = true) {
+  try {
+    // Bound local storage without losing the recent history used by Insights.
+    analyticsData.attempts = analyticsData.attempts.slice(-20000);
+    analyticsData.sessions = analyticsData.sessions.slice(-2000);
+    localStorage.setItem(ANALYTICS_KEY, JSON.stringify(analyticsData));
+  } catch (_) { /* Practice should continue even if storage is full or blocked. */ }
+  if (syncToCloud) scheduleAnalyticsSync();
+}
+function analyticsId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+function startAnalyticsSession(type, details = {}) {
+  const id = analyticsId(type);
+  analyticsData.sessions.push({
+    id, type, startedAt: new Date().toISOString(), endedAt: null,
+    selectedDecks: details.selectedDecks || [], mode: details.mode || null,
+    attempts: 0, correct: 0
+  });
+  saveAnalytics();
+  return id;
+}
+function finishAnalyticsSession(id) {
+  if (!id) return;
+  const session = analyticsData.sessions.find(item => item.id === id);
+  if (session && !session.endedAt) session.endedAt = new Date().toISOString();
+  saveAnalytics();
+}
+function recordAnalyticsAttempt(sessionId, sessionType, cardIndex, mode, correct) {
+  if (!sessionId || !cards[cardIndex]) return;
+  const card = cards[cardIndex];
+  analyticsData.attempts.push({
+    id: analyticsId("attempt"), sessionId, sessionType,
+    cardId: String(card.id), deck: card.deck || "Ungrouped", mode,
+    correct: !!correct, at: new Date().toISOString()
+  });
+  const session = analyticsData.sessions.find(item => item.id === sessionId);
+  if (session) {
+    session.attempts++;
+    if (correct) session.correct++;
+  }
+  saveAnalytics();
+}
+function localDayKey(value) {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+function dayStart(daysAgo = 0) {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - daysAgo);
+  return date;
+}
+function accuracyFor(attempts) {
+  return attempts.length ? Math.round(attempts.filter(item => item.correct).length / attempts.length * 100) : null;
+}
+function calculatePracticeStreak(attempts) {
+  const days = new Set(attempts.map(item => localDayKey(item.at)));
+  if (!days.size) return 0;
+  let cursor = dayStart(0);
+  if (!days.has(localDayKey(cursor))) cursor = dayStart(1);
+  let streak = 0;
+  while (days.has(localDayKey(cursor))) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+function analyticsRowsFromLocal() {
+  const rows = [];
+  analyticsData.sessions.forEach(session => {
+    rows.push({
+      event_id: `${session.id}:start`, session_id: session.id, event_type: "session_start",
+      session_type: session.type, card_id: null, deck: null, mode: session.mode,
+      correct: null, occurred_at: session.startedAt, selected_decks: session.selectedDecks || [],
+      device_id: analyticsDeviceId
+    });
+    if (session.endedAt) rows.push({
+      event_id: `${session.id}:end`, session_id: session.id, event_type: "session_end",
+      session_type: session.type, card_id: null, deck: null, mode: session.mode,
+      correct: null, occurred_at: session.endedAt, selected_decks: session.selectedDecks || [],
+      device_id: analyticsDeviceId
+    });
+  });
+  analyticsData.attempts.forEach(attempt => rows.push({
+    event_id: attempt.id, session_id: attempt.sessionId, event_type: "attempt",
+    session_type: attempt.sessionType, card_id: attempt.cardId, deck: attempt.deck,
+    mode: attempt.mode, correct: attempt.correct, occurred_at: attempt.at,
+    selected_decks: null, device_id: analyticsDeviceId
+  }));
+  return rows;
+}
+function mergeAnalyticsRows(rows) {
+  const sessions = new Map(analyticsData.sessions.map(session => [session.id, session]));
+  const attempts = new Map(analyticsData.attempts.map(attempt => [attempt.id, attempt]));
+  rows.forEach(row => {
+    if (row.event_type === "session_start") {
+      if (!sessions.has(row.session_id)) sessions.set(row.session_id, {
+        id: row.session_id, type: row.session_type, startedAt: row.occurred_at,
+        endedAt: null, selectedDecks: row.selected_decks || [], mode: row.mode || null,
+        attempts: 0, correct: 0
+      });
+    } else if (row.event_type === "session_end") {
+      const session = sessions.get(row.session_id);
+      if (session && (!session.endedAt || new Date(row.occurred_at) > new Date(session.endedAt))) {
+        session.endedAt = row.occurred_at;
+      }
+    } else if (row.event_type === "attempt" && !attempts.has(row.event_id)) {
+      attempts.set(row.event_id, {
+        id: row.event_id, sessionId: row.session_id, sessionType: row.session_type,
+        cardId: String(row.card_id), deck: row.deck || "Ungrouped", mode: row.mode,
+        correct: !!row.correct, at: row.occurred_at
+      });
+    }
+  });
+  analyticsData.sessions = [...sessions.values()].sort((a, b) => new Date(a.startedAt) - new Date(b.startedAt));
+  analyticsData.attempts = [...attempts.values()].sort((a, b) => new Date(a.at) - new Date(b.at));
+  const sessionStats = new Map();
+  analyticsData.attempts.forEach(attempt => {
+    const stat = sessionStats.get(attempt.sessionId) || { attempts: 0, correct: 0 };
+    stat.attempts++;
+    if (attempt.correct) stat.correct++;
+    sessionStats.set(attempt.sessionId, stat);
+  });
+  analyticsData.sessions.forEach(session => Object.assign(session, sessionStats.get(session.id) || { attempts: 0, correct: 0 }));
+  saveAnalytics(false);
+}
+function scheduleAnalyticsSync() {
+  if (!analyticsCloudAvailable) return;
+  analyticsSyncQueued = true;
+  clearTimeout(analyticsSyncTimer);
+  analyticsSyncTimer = setTimeout(() => { syncAnalytics(); }, 600);
+}
+async function syncAnalytics() {
+  if (!analyticsCloudAvailable) return;
+  if (analyticsSyncInFlight) return analyticsSyncInFlight;
+  analyticsSyncQueued = false;
+  analyticsSyncInFlight = (async () => {
+    try {
+      const localRows = analyticsRowsFromLocal();
+      for (let offset = 0; offset < localRows.length; offset += 400) {
+        const res = await fetch(ANALYTICS_REST + "?on_conflict=event_id", {
+          method: "POST",
+          headers: { ...HEADERS, "Prefer": "resolution=ignore-duplicates,return=minimal" },
+          body: JSON.stringify(localRows.slice(offset, offset + 400))
+        });
+        if (!res.ok) throw new Error(`Analytics upload failed (${res.status})`);
+      }
+      const remoteRows = [];
+      for (let offset = 0; ; offset += 1000) {
+        const res = await fetch(ANALYTICS_REST + `?select=*&order=occurred_at.asc&limit=1000&offset=${offset}`, { headers: HEADERS });
+        if (!res.ok) throw new Error(`Analytics download failed (${res.status})`);
+        const page = await res.json();
+        remoteRows.push(...page);
+        if (page.length < 1000) break;
+      }
+      mergeAnalyticsRows(remoteRows);
+      renderDailyFocus();
+      if (screens.insights.classList.contains("active")) renderInsights();
+    } catch (err) {
+      // A missing table should never block studying. Reload after creating the
+      // table to retry cloud sync; the complete local history is retained.
+      analyticsCloudAvailable = false;
+      console.warn(err.message);
+    } finally {
+      analyticsSyncInFlight = null;
+      if (analyticsSyncQueued && analyticsCloudAvailable) scheduleAnalyticsSync();
+    }
+  })();
+  return analyticsSyncInFlight;
+}
+
+async function refreshCards(showLoading) {
+  if (showLoading) setStatus("Loading\u2026");
+  try {
+    cards = await fetchCards();
+    document.getElementById("card-count").textContent = cards.length;
+    renderDailyFocus();
+    renderDiagnosticReminder();
+    setStatus("");
+  } catch (err) {
+    setStatus(err.message, true);
+  }
+  document.getElementById("btn-study").disabled = cards.length === 0;
+  document.getElementById("btn-learn").disabled = cards.length === 0;
+  document.getElementById("btn-smart-learn").disabled = cards.length === 0;
+  document.getElementById("btn-quiz").disabled = cards.length === 0;
+  document.getElementById("btn-manage").disabled = cards.length === 0;
+}
+
+// ---- Add card flow ----
+document.getElementById("add-toolbar").innerHTML = toolbarHTML("add");
+const addCanvasEl = document.getElementById("add-canvas");
+const addSC = new StrokeCanvas(addCanvasEl);
+wireToolbar(document.getElementById("add-toolbar"), addSC);
+addSC.onStrokeComplete = (stroke) => {
+  const pts = stroke.points;
+  const n = pts.length;
+  const durationMs = n > 1 ? Math.round(pts[n - 1].t - pts[0].t) : 0;
+  let travelPx = 0;
+  for (let i = 1; i < n; i++) {
+    const a = addSC._toPixel(pts[i - 1]), b = addSC._toPixel(pts[i]);
+    travelPx += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  document.getElementById("add-debug").textContent =
+    `debug: last stroke — ${n} point${n === 1 ? "" : "s"}, ${durationMs}ms, ${travelPx.toFixed(1)}px traveled`;
+};
+
+let addStage = "front";
+let pendingFront = null;
+let pendingBack = null;
+let selectedAddDeck = null;
+
+function knownDecks() {
+  return [...new Set(cards.map(card => card.deck).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+}
+function renderAddTags() {
+  const bar = document.getElementById("add-tag-bar");
+  bar.innerHTML = `<span class="tag-label">Group</span><button class="tag-chip ${selectedAddDeck ? "" : "active"}" data-deck="">None</button>`;
+  knownDecks().forEach(deck => {
+    const button = document.createElement("button");
+    button.className = `tag-chip ${deck === selectedAddDeck ? "active" : ""}`;
+    button.textContent = deck; button.dataset.deck = deck; bar.appendChild(button);
+  });
+  bar.querySelectorAll("[data-deck]").forEach(button => button.addEventListener("click", () => {
+    selectedAddDeck = button.dataset.deck || null;
+    renderAddTags();
+  }));
+}
+
+function renderAddStage() {
+  const editingBack = addStage === "back";
+  document.getElementById("add-side-label").textContent = editingBack ? "Back" : "Front";
+  document.getElementById("add-next").textContent = editingBack ? "Save card" : "Next: back →";
+  document.getElementById("add-edit-front").hidden = !editingBack;
+  animateCardChange(addCanvasEl);
+}
+
+function openAddCard(deck = null) {
+  addStage = "front"; pendingFront = null; pendingBack = null;
+  selectedAddDeck = deck;
+  addSC.clear();
+  renderAddTags();
+  renderAddStage();
+  showScreen("add");
+}
+document.getElementById("btn-add").addEventListener("click", () => openAddCard());
+document.getElementById("add-cancel").addEventListener("click", () => showScreen("home"));
+document.getElementById("add-clear").addEventListener("click", () => addSC.clear());
+document.getElementById("add-edit-front").addEventListener("click", () => {
+  pendingBack = addSC.getStrokes();
+  addStage = "front";
+  addSC.loadStrokes(pendingFront);
+  renderAddStage();
+});
+document.getElementById("add-next").addEventListener("click", async () => {
+  if (addStage === "front") {
+    if (addSC.getStrokes().length === 0) { setStatus("Write something on the front first", true); return; }
+    pendingFront = addSC.getStrokes();
+    addStage = "back";
+    addSC.loadStrokes(pendingBack);
+    renderAddStage();
+  } else {
+    if (addSC.getStrokes().length === 0) { setStatus("Write something on the back first", true); return; }
+    const backStrokes = addSC.getStrokes();
+    const saveButton = document.getElementById("add-next");
+    saveButton.disabled = true;
+    saveButton.classList.add("saving");
+    saveButton.setAttribute("aria-busy", "true");
+    saveButton.innerHTML = `<span class="save-spinner" aria-hidden="true"></span><span>Saving card…</span>`;
+    try {
+      await insertCard(pendingFront, backStrokes, selectedAddDeck);
+      await refreshCards();
+      addStage = "front"; pendingFront = null; pendingBack = null;
+      addSC.clear();
+      renderAddStage();
+      setStatus("Card saved. Add another, or Cancel to go back.");
+    } catch (err) {
+      setStatus(err.message, true);
+    } finally {
+      saveButton.disabled = false;
+      saveButton.classList.remove("saving");
+      saveButton.removeAttribute("aria-busy");
+      saveButton.textContent = addStage === "back" ? "Save card" : "Next: back →";
+    }
+  }
+});
+
+// ---- Study flow ----
+const studySC = new StrokeCanvas(document.getElementById("study-canvas"), { readOnly: true });
+let studyOrder = [], studyIdx = 0, studyShowingBack = false;
+let selectedStudyGroups = new Set();
+
+function studyGroupValues() {
+  return [...knownDecks(), ...(cards.some(card => !card.deck) ? [UNGROUPED_QUIZ_VALUE] : [])];
+}
+function updateStudySelectAllLabel() {
+  const values = studyGroupValues();
+  document.getElementById("study-select-all").textContent = values.length && values.every(value => selectedStudyGroups.has(value))
+    ? "Deselect all" : "Select all";
+}
+function renderStudyGroupPicker(selectAll = false) {
+  const values = studyGroupValues();
+  if (selectAll) selectedStudyGroups = new Set(values);
+  const list = document.getElementById("study-group-list");
+  list.innerHTML = "";
+  values.forEach(value => {
+    const label = document.createElement("label");
+    label.className = "quiz-group-option";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox"; checkbox.value = value; checkbox.checked = selectedStudyGroups.has(value);
+    const name = document.createElement("span");
+    name.textContent = value === UNGROUPED_QUIZ_VALUE ? "Ungrouped" : value;
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) selectedStudyGroups.add(value); else selectedStudyGroups.delete(value);
+      updateStudySelectAllLabel();
+    });
+    label.append(checkbox, name); list.appendChild(label);
+  });
+  updateStudySelectAllLabel();
+}
+function openStudyPicker() {
+  const study = document.getElementById("study");
+  study.classList.add("study-picking");
+  document.getElementById("study-progress").textContent = "";
+  document.getElementById("study-side").textContent = "Choose sets";
+  renderStudyGroupPicker(true);
+  showScreen("study");
+}
+document.getElementById("btn-study").addEventListener("click", openStudyPicker);
+document.getElementById("study-select-all").addEventListener("click", () => {
+  const values = studyGroupValues();
+  const shouldSelectAll = !values.every(value => selectedStudyGroups.has(value));
+  selectedStudyGroups = shouldSelectAll ? new Set(values) : new Set();
+  renderStudyGroupPicker();
+});
+document.getElementById("study-start").addEventListener("click", () => {
+  const eligibleIndexes = cards.map((card, index) => ({ card, index }))
+    .filter(({ card }) => selectedStudyGroups.has(card.deck || UNGROUPED_QUIZ_VALUE))
+    .map(({ index }) => index);
+  if (eligibleIndexes.length === 0) {
+    document.getElementById("study-side").textContent = "Select at least one set";
+    return;
+  }
+  studyOrder = shuffledIndexes(eligibleIndexes.length).map(index => eligibleIndexes[index]);
+  studyIdx = 0; studyShowingBack = false;
+  document.getElementById("study").classList.remove("study-picking");
+  renderStudy();
+});
+function shuffledIndexes(n) {
+  const arr = Array.from({ length: n }, (_, i) => i);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+function renderStudy() {
+  const card = cards[studyOrder[studyIdx]];
+  studySC.loadStrokes(studyShowingBack ? card.back_strokes : card.front_strokes);
+  document.getElementById("study-progress").textContent = `${studyIdx + 1} / ${studyOrder.length}`;
+  document.getElementById("study-side").textContent = studyShowingBack ? "Back" : "Front";
+  animateCardChange(studySC.canvas);
+}
+document.getElementById("study-flip").addEventListener("click", () => {
+  studyShowingBack = !studyShowingBack;
+  renderStudy();
+});
+document.getElementById("study-prev").addEventListener("click", () => {
+  studyIdx = (studyIdx - 1 + studyOrder.length) % studyOrder.length;
+  studyShowingBack = false;
+  renderStudy();
+});
+document.getElementById("study-next").addEventListener("click", () => {
+  studyIdx = (studyIdx + 1) % studyOrder.length;
+  studyShowingBack = false;
+  renderStudy();
+});
+document.getElementById("study-exit").addEventListener("click", () => showScreen("home"));
+
+// ---- Quiz flow ----
+document.getElementById("quiz-toolbar").innerHTML = toolbarHTML("quiz");
+const quizFrontSC = new StrokeCanvas(document.getElementById("quiz-front-canvas"), { readOnly: true });
+const quizAnswerSC = new StrokeCanvas(document.getElementById("quiz-answer-canvas"));
+const quizYourSC = new StrokeCanvas(document.getElementById("quiz-your-canvas"), { readOnly: true });
+const quizRealSC = new StrokeCanvas(document.getElementById("quiz-real-canvas"), { readOnly: true });
+const quizTfFrontSC = new StrokeCanvas(document.getElementById("quiz-tf-front-canvas"), { readOnly: true });
+const quizTfDefinitionSC = new StrokeCanvas(document.getElementById("quiz-tf-definition-canvas"), { readOnly: true });
+const quizTfRealSC = new StrokeCanvas(document.getElementById("quiz-tf-real-canvas"), { readOnly: true });
+wireToolbar(document.getElementById("quiz-toolbar"), quizAnswerSC);
+
+let quizOrder = [], quizIdx = 0, quizMode = "write", activeQuizMode = "write", choiceCount = 4;
+let questionCount = "infinite", quizCorrect = 0, quizResults = new Map();
+let selectedQuizGroups = new Set();
+let customQuizModes = new Set(["write", "choice", "truefalse", "match"]);
+let quizWriteReadyAt = 0;
+let learnWriteReadyAt = 0;
+let thinkPopupTimer = null;
+function showThinkPopup() {
+  const popup = document.getElementById("think-popup");
+  clearTimeout(thinkPopupTimer);
+  popup.hidden = true;
+  requestAnimationFrame(() => { popup.hidden = false; });
+  thinkPopupTimer = setTimeout(() => { popup.hidden = true; }, 2200);
+}
+function writeAnswerIsLocked(readyAt) {
+  if (Date.now() >= readyAt) return false;
+  showThinkPopup();
+  return true;
+}
+function setQuizProgress(current, total = quizOrder.length) {
+  const progress = document.getElementById("quiz-progress");
+  const bar = document.getElementById("quiz-progress-bar");
+  if (!total) {
+    progress.hidden = true;
+    bar.style.width = "0%";
+    return;
+  }
+  const value = Math.min(Math.max(current, 0), total);
+  progress.hidden = false;
+  progress.setAttribute("aria-valuemax", total);
+  progress.setAttribute("aria-valuenow", value);
+  progress.setAttribute("aria-valuetext", `${value} of ${total} questions`);
+  bar.style.width = `${value / total * 100}%`;
+}
+const UNGROUPED_QUIZ_VALUE = "__ungrouped__";
+const correctSound = new Audio("correct.mp3");
+const wrongSound = new Audio("wrong.mp3");
+const finishedSound = new Audio("finished.mp3");
+correctSound.preload = "auto";
+wrongSound.preload = "auto";
+finishedSound.preload = "auto";
+
+function playSound(soundTemplate) {
+  try {
+    // A fresh instance lets rapid answer feedback overlap without cutting off
+    // the previous sound.
+    const sound = soundTemplate.cloneNode();
+    sound.play().catch(() => {});
+  } catch (_) { /* Sound is optional when the browser blocks audio. */ }
+}
+function playCorrectSound() { playSound(correctSound); }
+function playWrongSound() { playSound(wrongSound); }
+function playFinishedSound() { playSound(finishedSound); }
+
+function quizGroupValues() {
+  return [...knownDecks(), ...(cards.some(card => !card.deck) ? [UNGROUPED_QUIZ_VALUE] : [])];
+}
+function renderQuizGroupPicker(selectAll = false) {
+  const values = quizGroupValues();
+  if (selectAll) selectedQuizGroups = new Set(values);
+  const list = document.getElementById("quiz-group-list");
+  list.innerHTML = "";
+  values.forEach(value => {
+    const label = document.createElement("label");
+    label.className = "quiz-group-option";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox"; checkbox.value = value; checkbox.checked = selectedQuizGroups.has(value);
+    const name = document.createElement("span"); name.textContent = value === UNGROUPED_QUIZ_VALUE ? "Ungrouped" : value;
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) selectedQuizGroups.add(value); else selectedQuizGroups.delete(value);
+      updateQuizSelectAllLabel();
+    });
+    label.append(checkbox, name); list.appendChild(label);
+  });
+  updateQuizSelectAllLabel();
+}
+function updateQuizSelectAllLabel() {
+  const values = quizGroupValues();
+  document.getElementById("quiz-select-all").textContent = values.length && values.every(value => selectedQuizGroups.has(value))
+    ? "Deselect all" : "Select all";
+}
+
+function drawMiniCard(canvas, strokes) {
+  requestAnimationFrame(() => {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, rect.width * dpr); canvas.height = Math.max(1, rect.height * dpr);
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.strokeStyle = "#1F2421"; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    (strokes || []).forEach(s => {
+      if (!s.points || s.points.length === 0) return;
+      ctx.lineWidth = s.width || 2;
+      if (s.points.length === 1) {
+        ctx.beginPath();
+        ctx.arc(s.points[0].x * rect.width, s.points[0].y * rect.height, ctx.lineWidth / 2, 0, Math.PI * 2);
+        ctx.fillStyle = "#1F2421"; ctx.fill();
+        return;
+      }
+      ctx.beginPath();
+      s.points.forEach((p, i) => {
+        const x = p.x * rect.width, y = p.y * rect.height;
+        if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      });
+      ctx.stroke();
+    });
+  });
+}
+function setQuizMode(mode) {
+  quizMode = mode;
+  if (mode === "custom") {
+    customQuizModes = new Set([...document.querySelectorAll("#quiz-type-options input:checked")].map(input => input.value));
+    if (customQuizModes.size === 0) {
+      document.getElementById("quiz-instruction").textContent = "Choose at least one question type.";
+      return;
+    }
+  }
+  const eligibleIndexes = cards.map((card, index) => ({ card, index }))
+    .filter(({ card }) => selectedQuizGroups.has(card.deck || UNGROUPED_QUIZ_VALUE))
+    .map(({ index }) => index);
+  if (eligibleIndexes.length === 0) {
+    document.getElementById("quiz-instruction").textContent = "Select at least one group to start.";
+    return;
+  }
+  if (questionCount !== "infinite" && (!Number.isInteger(questionCount) || questionCount < 1)) {
+    document.getElementById("quiz-instruction").textContent = "Enter a whole number of questions, or choose ∞.";
+    return;
+  }
+  quizOrder = shuffledIndexes(eligibleIndexes.length).map(index => eligibleIndexes[index]);
+  if (questionCount !== "infinite") quizOrder = quizOrder.slice(0, Number(questionCount));
+  currentQuizQualifiesAsDiagnostic = mode === "write"
+    && questionCount !== "infinite"
+    && eligibleIndexes.length === cards.length
+    && quizOrder.length === cards.length;
+  if (mode === "custom" && quizOrder.length <= 2 && [...customQuizModes].every(questionType => questionType === "match")) {
+    document.getElementById("quiz-instruction").textContent = "Matching needs at least three cards in the quiz set.";
+    return;
+  }
+  finishAnalyticsSession(activeQuizSessionId);
+  activeQuizSessionId = startAnalyticsSession("quiz", {
+    selectedDecks: [...selectedQuizGroups].map(value => value === UNGROUPED_QUIZ_VALUE ? "Ungrouped" : value),
+    mode
+  });
+  quizIdx = 0;
+  quizCorrect = 0;
+  quizResults = new Map();
+  const quiz = document.getElementById("quiz");
+  quiz.classList.remove("quiz-mode-picking", "quiz-summary-showing");
+  startQuizCard();
+}
+document.getElementById("btn-quiz").addEventListener("click", () => {
+  currentQuizQualifiesAsDiagnostic = false;
+  const quiz = document.getElementById("quiz");
+  quiz.classList.add("quiz-mode-picking");
+  renderQuizGroupPicker(true);
+  setQuizProgress(0, 0);
+  document.getElementById("quiz-instruction").textContent = "Choose a quiz mode";
+  showScreen("quiz");
+});
+document.getElementById("quiz-select-all").addEventListener("click", () => {
+  const values = quizGroupValues();
+  const shouldSelectAll = !values.every(value => selectedQuizGroups.has(value));
+  selectedQuizGroups = shouldSelectAll ? new Set(values) : new Set();
+  renderQuizGroupPicker();
+});
+document.querySelectorAll("[data-quiz-mode]").forEach(button => {
+  button.addEventListener("click", () => setQuizMode(button.dataset.quizMode));
+});
+document.getElementById("quiz-start-custom").addEventListener("click", () => setQuizMode("custom"));
+document.querySelectorAll("[data-choice-count]").forEach(button => {
+  button.addEventListener("click", () => {
+    choiceCount = Number(button.dataset.choiceCount);
+    document.querySelectorAll("[data-choice-count]").forEach(b => b.classList.toggle("active", b === button));
+  });
+});
+document.querySelectorAll("[data-question-count]").forEach(button => {
+  button.addEventListener("click", () => {
+    questionCount = button.dataset.questionCount;
+    document.getElementById("quiz-question-input").value = "";
+    document.querySelectorAll("[data-question-count]").forEach(b => b.classList.toggle("active", b === button));
+  });
+});
+document.getElementById("quiz-question-input").addEventListener("input", event => {
+  questionCount = Number(event.target.value);
+  document.querySelectorAll("[data-question-count]").forEach(button => button.classList.remove("active"));
+});
+function startQuizCard(selectNewMixedMode = true) {
+  document.getElementById("quiz").classList.remove("quiz-summary-showing");
+  document.getElementById("quiz-summary").classList.remove("active");
+  document.getElementById("quiz-true-false").classList.remove("active");
+  document.getElementById("quiz-tf-real").hidden = true;
+  document.getElementById("quiz-actions-true-false").classList.remove("active");
+  if (quizMode !== "mixed" || selectNewMixedMode) {
+    const matchingAllowed = quizOrder.length > 2;
+    const mixedModes = ["write", "choice", "truefalse", ...(matchingAllowed ? ["match"] : [])];
+    const customModes = [...customQuizModes].filter(mode => mode !== "match" || matchingAllowed);
+    const modes = quizMode === "mixed" ? mixedModes : quizMode === "custom" ? customModes : [quizMode];
+    activeQuizMode = modes[Math.floor(Math.random() * modes.length)];
+  }
+  if (activeQuizMode === "match") { startMatchingRound(); return; }
+  if (activeQuizMode === "truefalse") { startTrueFalse(); return; }
+  const card = cards[quizOrder[quizIdx]];
+  quizWriteReadyAt = activeQuizMode === "write" ? Date.now() + 5000 : 0;
+  quizFrontSC.loadStrokes(card.front_strokes);
+  quizAnswerSC.clear();
+  setQuizProgress(quizIdx + 1);
+  document.getElementById("quiz-instruction").textContent = activeQuizMode === "choice" ? "Choose the matching answer" : "Write your answer below";
+  document.querySelector("#quiz-front-canvas").closest(".canvas-wrap").style.display = "";
+  document.getElementById("quiz-toolbar").style.display = "";
+  document.getElementById("quiz-answer-wrap").style.display = "";
+  document.getElementById("quiz-compare").classList.remove("active");
+  document.getElementById("quiz-multiple-choice").classList.remove("active");
+  document.getElementById("quiz-matching").classList.remove("active");
+  document.getElementById("quiz-actions-write").style.display = "";
+  document.getElementById("quiz-actions-reveal").style.display = "none";
+  document.getElementById("quiz-mark-right").hidden = true;
+  document.getElementById("quiz-mark-wrong").hidden = true;
+  document.getElementById("quiz-mark-right").disabled = false;
+  document.getElementById("quiz-mark-wrong").disabled = false;
+  document.getElementById("quiz-next").disabled = false;
+  if (activeQuizMode === "choice") startMultipleChoice(card);
+  animateCardChange(quizFrontSC.canvas);
+}
+function showQuizNextActions() {
+  document.getElementById("quiz-actions-write").style.display = "none";
+  document.getElementById("quiz-actions-reveal").style.display = "";
+}
+function startTrueFalse() {
+  const answerIndex = quizOrder[quizIdx];
+  const card = cards[answerIndex];
+  const answerDeck = card.deck || null;
+  const sameGroup = cards.map((candidate, index) => ({ candidate, index }))
+    .filter(({ candidate, index }) => index !== answerIndex && (candidate.deck || null) === answerDeck)
+    .map(({ index }) => index);
+  const outsideGroup = cards.map((candidate, index) => ({ candidate, index }))
+    .filter(({ candidate, index }) => index !== answerIndex && (candidate.deck || null) !== answerDeck)
+    .map(({ index }) => index);
+  const canShowFalse = sameGroup.length + outsideGroup.length > 0;
+  const isTrue = !canShowFalse || Math.random() < 0.5;
+  let displayedIndex = answerIndex;
+  if (!isTrue) {
+    const preferredPool = Math.random() < 0.6 ? sameGroup : outsideGroup;
+    const fallbackPool = preferredPool === sameGroup ? outsideGroup : sameGroup;
+    const pool = preferredPool.length ? preferredPool : fallbackPool;
+    displayedIndex = pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  document.querySelector("#quiz-front-canvas").closest(".canvas-wrap").style.display = "none";
+  document.getElementById("quiz-answer-wrap").style.display = "none";
+  document.getElementById("quiz-toolbar").style.display = "none";
+  document.getElementById("quiz-compare").classList.remove("active");
+  document.getElementById("quiz-multiple-choice").classList.remove("active");
+  document.getElementById("quiz-matching").classList.remove("active");
+  document.getElementById("quiz-actions-write").style.display = "none";
+  document.getElementById("quiz-actions-reveal").style.display = "none";
+  document.getElementById("quiz-mark-right").hidden = true;
+  document.getElementById("quiz-mark-wrong").hidden = true;
+  const trueFalse = document.getElementById("quiz-true-false");
+  const realDefinition = document.getElementById("quiz-tf-real");
+  realDefinition.hidden = true;
+  trueFalse.classList.add("active");
+  quizTfFrontSC.loadStrokes(card.front_strokes);
+  quizTfDefinitionSC.loadStrokes(cards[displayedIndex].back_strokes);
+  setQuizProgress(quizIdx + 1);
+  document.getElementById("quiz-instruction").textContent = "Do this word and definition match?";
+  const actionBar = document.getElementById("quiz-actions-true-false");
+  const trueButton = document.getElementById("quiz-tf-true");
+  const falseButton = document.getElementById("quiz-tf-false");
+  [trueButton, falseButton].forEach(button => {
+    button.disabled = false;
+    button.classList.remove("correct", "incorrect");
+  });
+  actionBar.classList.add("active");
+  const submit = selectedTrue => {
+    if (trueButton.disabled) return;
+    const correct = selectedTrue === isTrue;
+    recordQuizResult(answerIndex, correct);
+    [trueButton, falseButton].forEach(button => button.disabled = true);
+    const selectedButton = selectedTrue ? trueButton : falseButton;
+    const correctButton = isTrue ? trueButton : falseButton;
+    selectedButton.classList.add(correct ? "correct" : "incorrect");
+    if (!correct) correctButton.classList.add("correct");
+    if (!isTrue) {
+      realDefinition.hidden = false;
+      quizTfRealSC.loadStrokes(card.back_strokes);
+    }
+    document.getElementById("quiz-instruction").textContent = correct ? "Correct" : "Not quite";
+    actionBar.classList.remove("active");
+    showQuizNextActions();
+  };
+  trueButton.onclick = () => submit(true);
+  falseButton.onclick = () => submit(false);
+}
+function recordQuizResult(cardIndex, isCorrect) {
+  // Analytics includes every graded attempt, including retries and later laps
+  // through an infinite quiz. The on-screen quiz score remains first-attempt.
+  recordAnalyticsAttempt(activeQuizSessionId, "quiz", cardIndex, activeQuizMode, isCorrect);
+  // The first result is the score for that card; retrying a matching pair does
+  // not turn a missed answer into a correct first attempt.
+  if (quizResults.has(cardIndex)) return;
+  quizResults.set(cardIndex, isCorrect);
+  if (isCorrect) { quizCorrect++; playCorrectSound(); }
+  else playWrongSound();
+}
+function startMultipleChoice(card) {
+  document.getElementById("quiz-answer-wrap").style.display = "none";
+  document.getElementById("quiz-toolbar").style.display = "none";
+  document.getElementById("quiz-actions-write").style.display = "none";
+  const requestedDistractors = Math.max(0, choiceCount - 1);
+  const answerIndex = quizOrder[quizIdx];
+  const answerDeck = card.deck || null;
+  const sameGroup = cards.map((candidate, index) => ({ candidate, index }))
+    .filter(({ candidate, index }) => index !== answerIndex && (candidate.deck || null) === answerDeck)
+    .map(({ index }) => index);
+  const outsideGroup = cards.map((candidate, index) => ({ candidate, index }))
+    .filter(({ candidate, index }) => index !== answerIndex && (candidate.deck || null) !== answerDeck)
+    .map(({ index }) => index);
+  const pick = (pool, count) => shuffledIndexes(pool.length).slice(0, count).map(index => pool[index]);
+  const sameGroupTarget = Math.round(requestedDistractors * 0.6);
+  const choices = pick(sameGroup, sameGroupTarget);
+  choices.push(...pick(outsideGroup, requestedDistractors - choices.length));
+  // Smaller groups may not have enough cards for a strict 60/40 split.
+  // Fill remaining spots from any unused card rather than showing fewer choices.
+  if (choices.length < requestedDistractors) {
+    const used = new Set(choices);
+    choices.push(...pick([...sameGroup, ...outsideGroup].filter(index => !used.has(index)), requestedDistractors - choices.length));
+  }
+  choices.push(answerIndex);
+  const choiceWrap = document.getElementById("quiz-multiple-choice");
+  delete choiceWrap.dataset.answered;
+  choiceWrap.innerHTML = ""; choiceWrap.classList.add("active");
+  shuffledIndexes(choices.length).map(i => choices[i]).forEach(cardIndex => {
+    const button = document.createElement("button");
+    button.className = "choice-card"; button.setAttribute("aria-label", "Answer choice");
+    const canvas = document.createElement("canvas"); button.appendChild(canvas); choiceWrap.appendChild(button);
+    drawMiniCard(canvas, cards[cardIndex].back_strokes);
+    button.addEventListener("click", () => {
+      if (choiceWrap.dataset.answered) return;
+      choiceWrap.dataset.answered = "true"; button.classList.add("selected");
+      choiceWrap.querySelectorAll("button").forEach(b => b.disabled = true);
+      button.classList.add(cardIndex === quizOrder[quizIdx] ? "correct" : "incorrect");
+      if (cardIndex !== quizOrder[quizIdx]) {
+        choiceWrap.querySelectorAll("button").forEach(b => {
+          if (b !== button && b._cardIndex === quizOrder[quizIdx]) b.classList.add("correct");
+        });
+      }
+      recordQuizResult(quizOrder[quizIdx], cardIndex === quizOrder[quizIdx]);
+      showQuizNextActions();
+    });
+    button._cardIndex = cardIndex;
+  });
+}
+function startMatchingRound() {
+  const roundIndexes = quizOrder.slice(quizIdx, quizIdx + Math.min(4, quizOrder.length - quizIdx));
+  const roundCards = roundIndexes.map(i => cards[i]);
+  const matching = document.getElementById("quiz-matching");
+  document.querySelector("#quiz-front-canvas").closest(".canvas-wrap").style.display = "none";
+  document.getElementById("quiz-answer-wrap").style.display = "none";
+  document.getElementById("quiz-toolbar").style.display = "none";
+  document.getElementById("quiz-actions-write").style.display = "none";
+  document.getElementById("quiz-compare").classList.remove("active");
+  document.getElementById("quiz-multiple-choice").classList.remove("active");
+  document.getElementById("quiz-true-false").classList.remove("active");
+  document.getElementById("quiz-actions-true-false").classList.remove("active");
+  document.getElementById("quiz-actions-reveal").style.display = "none";
+  document.getElementById("quiz-mark-right").hidden = true;
+  document.getElementById("quiz-mark-wrong").hidden = true;
+  document.getElementById("quiz-next").disabled = false;
+  document.getElementById("quiz-instruction").textContent = "Tap a front, then its answer";
+  // Matching is a multi-card round. Start from completed questions and advance
+  // the meter as each pair is solved instead of jumping to the round's end.
+  setQuizProgress(quizIdx);
+  matching.innerHTML = `<div class="match-column" style="--match-count:${roundCards.length}"></div><div class="match-column" style="--match-count:${roundCards.length}"></div>`;
+  matching.classList.add("active");
+  const [frontCol, backCol] = matching.querySelectorAll(".match-column");
+  const shuffledBacks = shuffledIndexes(roundCards.length).map(i => roundCards[i]);
+  let selectedFront = null, selectedBack = null, completed = 0;
+  const checkPair = () => {
+    if (!selectedFront || !selectedBack) return;
+    if (selectedFront._card.id === selectedBack._card.id) {
+      selectedFront.classList.add("correct"); selectedBack.classList.add("correct");
+      selectedFront.disabled = true; selectedBack.disabled = true; completed++;
+      recordQuizResult(cards.indexOf(selectedFront._card), true);
+      setQuizProgress(quizIdx + completed);
+      if (completed === roundCards.length) showQuizNextActions();
+    } else {
+      const wrongFront = selectedFront, wrongBack = selectedBack;
+      recordQuizResult(cards.indexOf(wrongFront._card), false);
+      wrongFront.classList.add("incorrect"); wrongBack.classList.add("incorrect");
+      setTimeout(() => { wrongFront.classList.remove("selected", "incorrect"); wrongBack.classList.remove("selected", "incorrect"); }, 350);
+    }
+    selectedFront = selectedBack = null;
+  };
+  const addMatchCard = (column, card, strokes, side) => {
+    const button = document.createElement("button"); button.className = "match-card"; button._card = card;
+    const canvas = document.createElement("canvas"); button.appendChild(canvas); column.appendChild(button); drawMiniCard(canvas, strokes);
+    button.addEventListener("click", () => {
+      if (button.disabled) return;
+      const selected = side === "front" ? selectedFront : selectedBack;
+      if (selected) selected.classList.remove("selected");
+      if (side === "front") selectedFront = button; else selectedBack = button;
+      button.classList.add("selected"); checkPair();
+    });
+  };
+  roundCards.forEach(card => addMatchCard(frontCol, card, card.front_strokes, "front"));
+  shuffledBacks.forEach(card => addMatchCard(backCol, card, card.back_strokes, "back"));
+}
+document.getElementById("quiz-clear").addEventListener("click", () => quizAnswerSC.clear());
+document.getElementById("quiz-reveal").addEventListener("click", () => {
+  if (activeQuizMode === "write" && writeAnswerIsLocked(quizWriteReadyAt)) return;
+  const card = cards[quizOrder[quizIdx]];
+  document.getElementById("quiz-answer-wrap").style.display = "none";
+  document.getElementById("quiz-compare").classList.add("active");
+  quizYourSC.loadStrokes(quizAnswerSC.getStrokes());
+  quizRealSC.loadStrokes(card.back_strokes);
+  document.getElementById("quiz-actions-write").style.display = "none";
+  document.getElementById("quiz-actions-reveal").style.display = "";
+  const isWrittenQuestion = activeQuizMode === "write";
+  document.getElementById("quiz-mark-right").hidden = !isWrittenQuestion;
+  document.getElementById("quiz-mark-wrong").hidden = !isWrittenQuestion;
+  document.getElementById("quiz-next").disabled = isWrittenQuestion;
+  animateCardChange(quizRealSC.canvas);
+});
+function markWrittenAnswer(isCorrect) {
+  if (document.getElementById("quiz-mark-right").disabled) return;
+  recordQuizResult(quizOrder[quizIdx], isCorrect);
+  document.getElementById("quiz-mark-right").disabled = true;
+  document.getElementById("quiz-mark-wrong").disabled = true;
+  document.getElementById("quiz-next").disabled = false;
+  document.getElementById("quiz-instruction").textContent = isCorrect
+    ? `Marked right · ${quizCorrect} correct`
+    : `Marked wrong · ${quizCorrect} correct`;
+}
+document.getElementById("quiz-mark-right").addEventListener("click", () => markWrittenAnswer(true));
+document.getElementById("quiz-mark-wrong").addEventListener("click", () => markWrittenAnswer(false));
+function nextQuizCard() {
+  const advance = activeQuizMode === "match" ? Math.min(4, quizOrder.length - quizIdx) : 1;
+  const nextIndex = quizIdx + advance;
+  if (questionCount !== "infinite" && nextIndex >= quizOrder.length) {
+    showQuizSummary();
+    return;
+  }
+  quizIdx = nextIndex % quizOrder.length;
+  startQuizCard();
+}
+function showQuizSummary() {
+  const wrongIndexes = [...quizResults.entries()].filter(([, correct]) => !correct).map(([index]) => index);
+  const total = quizOrder.length;
+  const perfect = quizCorrect === total;
+  const summary = document.getElementById("quiz-summary");
+  summary.innerHTML = `<div class="quiz-summary-card">${perfect ? '<div class="confetti">🎉 ✨ 🎉</div>' : ""}<h2>${perfect ? "Perfect score!" : "Quiz complete"}</h2><p>${quizCorrect} of ${total} correct${wrongIndexes.length ? ` · ${wrongIndexes.length} to review` : ""}</p><div class="quiz-summary-actions"><button class="primary" id="quiz-redo-wrong" ${wrongIndexes.length ? "" : "hidden"}>Redo missed cards</button><button id="quiz-new-round">Choose a new quiz</button></div></div>`;
+  document.getElementById("quiz").classList.add("quiz-summary-showing");
+  summary.classList.add("active");
+  finishAnalyticsSession(activeQuizSessionId);
+  activeQuizSessionId = null;
+  if (currentQuizQualifiesAsDiagnostic) {
+    currentQuizQualifiesAsDiagnostic = false;
+    recordDiagnosticCompletion();
+  }
+  playFinishedSound();
+  const redo = document.getElementById("quiz-redo-wrong");
+  if (redo) redo.addEventListener("click", () => {
+    quizOrder = wrongIndexes;
+    quizIdx = 0; quizCorrect = 0; quizResults = new Map();
+    activeQuizSessionId = startAnalyticsSession("quiz", {
+      selectedDecks: [...selectedQuizGroups].map(value => value === UNGROUPED_QUIZ_VALUE ? "Ungrouped" : value),
+      mode: `${quizMode}-retry`
+    });
+    document.getElementById("quiz").classList.remove("quiz-summary-showing");
+    startQuizCard();
+  });
+  document.getElementById("quiz-new-round").addEventListener("click", () => {
+    const quiz = document.getElementById("quiz");
+    quiz.classList.remove("quiz-summary-showing");
+    quiz.classList.add("quiz-mode-picking");
+    renderQuizGroupPicker(true);
+    setQuizProgress(0, 0);
+    document.getElementById("quiz-instruction").textContent = "Choose a quiz mode";
+  });
+}
+document.getElementById("quiz-again").addEventListener("click", () => startQuizCard(false));
+document.getElementById("quiz-next").addEventListener("click", nextQuizCard);
+document.getElementById("quiz-exit").addEventListener("click", () => {
+  finishAnalyticsSession(activeQuizSessionId);
+  activeQuizSessionId = null;
+  currentQuizQualifiesAsDiagnostic = false;
+  showScreen("home");
+});
+
+// ---- Learn flow ----
+document.getElementById("learn-toolbar").innerHTML = toolbarHTML("learn");
+const learnFrontSC = new StrokeCanvas(document.getElementById("learn-front-canvas"), { readOnly: true });
+const learnAnswerSC = new StrokeCanvas(document.getElementById("learn-answer-canvas"));
+const learnYourSC = new StrokeCanvas(document.getElementById("learn-your-canvas"), { readOnly: true });
+const learnRealSC = new StrokeCanvas(document.getElementById("learn-real-canvas"), { readOnly: true });
+wireToolbar(document.getElementById("learn-toolbar"), learnAnswerSC);
+
+const LEARN_ROUND_SIZE = 7;
+const SMART_LEARN_CARD_LIMIT = 14;
+let selectedLearnGroups = new Set();
+let learnSessionIndexes = [];
+let learnMastery = new Map();
+let learnRetryIndexes = new Set();
+let learnRound = [];
+let learnRoundNumber = 0;
+let learnQuestionIndex = 0;
+let learnRoundCorrect = 0;
+let learnQuestionAnswered = false;
+let learnIsSmart = false;
+let learnSmartScores = new Map();
+let learnSmartHistory = new Map();
+let learnSmartDeckNames = [];
+
+function buildSmartLearnPlan() {
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const cardHistory = new Map(cards.map((card, index) => [String(card.id), {
+    index, attempts: 0, misses: 0, weightedAttempts: 0, weightedMisses: 0,
+    lastAt: 0, lastCorrect: null
+  }]));
+  const deckHistory = new Map();
+  analyticsData.attempts.forEach(attempt => {
+    const at = new Date(attempt.at).getTime();
+    if (!Number.isFinite(at)) return;
+    const ageDays = Math.max(0, (now - at) / dayMs);
+    const weight = Math.pow(0.5, ageDays / 14);
+    const cardStat = cardHistory.get(String(attempt.cardId));
+    if (cardStat) {
+      cardStat.attempts++;
+      if (!attempt.correct) cardStat.misses++;
+      cardStat.weightedAttempts += weight;
+      if (!attempt.correct) cardStat.weightedMisses += weight;
+      if (at >= cardStat.lastAt) {
+        cardStat.lastAt = at;
+        cardStat.lastCorrect = !!attempt.correct;
+      }
+    }
+    const deck = attempt.deck || "Ungrouped";
+    const deckStat = deckHistory.get(deck) || { attempts: 0, misses: 0 };
+    deckStat.attempts++;
+    if (!attempt.correct) deckStat.misses++;
+    deckHistory.set(deck, deckStat);
+  });
+
+  const deckScores = new Map();
+  cards.forEach(card => {
+    const deck = card.deck || "Ungrouped";
+    const stat = deckHistory.get(deck) || { attempts: 0, misses: 0 };
+    // A small Bayesian prior prevents a set with one miss from overwhelming a
+    // set with a longer, consistently difficult history.
+    deckScores.set(deck, (stat.misses + 1) / (stat.attempts + 2));
+  });
+
+  const scored = cards.map((card, index) => {
+    const history = cardHistory.get(String(card.id));
+    const deck = card.deck || "Ungrouped";
+    const cardMissRate = (history.misses + 1) / (history.attempts + 2);
+    const recentMissRate = history.weightedAttempts
+      ? history.weightedMisses / history.weightedAttempts
+      : 0.35;
+    const daysSince = history.lastAt ? Math.max(0, (now - history.lastAt) / dayMs) : 45;
+    const overdue = Math.min(1, daysSince / 30);
+    const confidence = Math.min(1, history.attempts / 8);
+    const lastMissBoost = history.lastCorrect === false ? 1 : 0;
+    const unseenBoost = history.attempts === 0 ? 0.16 : 0;
+    const score = cardMissRate * 0.42
+      + (deckScores.get(deck) || 0.5) * 0.22
+      + recentMissRate * 0.18
+      + overdue * 0.10
+      + confidence * 0.03
+      + lastMissBoost * 0.15
+      + unseenBoost;
+    return { index, deck, score, attempts: history.attempts };
+  }).sort((a, b) => b.score - a.score || b.attempts - a.attempts);
+
+  const targetCount = Math.min(SMART_LEARN_CARD_LIMIT, cards.length);
+  const weakDecks = [...deckScores.entries()]
+    .filter(([deck]) => (deckHistory.get(deck)?.misses || 0) > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([deck]) => deck);
+  const selected = [];
+  const selectedSet = new Set();
+  const add = item => {
+    if (selected.length < targetCount && !selectedSet.has(item.index)) {
+      selected.push(item);
+      selectedSet.add(item.index);
+    }
+  };
+  // Reserve a little space for each weakest set, then fill by card-level need.
+  weakDecks.forEach(deck => scored.filter(item => item.deck === deck).slice(0, 2).forEach(add));
+  scored.forEach(add);
+
+  return {
+    indexes: selected.map(item => item.index),
+    scores: new Map(selected.map(item => [item.index, item.score])),
+    history: new Map(selected.map(item => [item.index, item.attempts])),
+    decks: [...new Set(selected.map(item => item.deck))],
+    weakDecks
+  };
+}
+
+function renderDailyFocus() {
+  const message = document.getElementById("daily-focus");
+  const setName = document.getElementById("daily-focus-set");
+  if (!message || !setName || cards.length === 0) {
+    if (message) message.hidden = true;
+    return;
+  }
+  const plan = buildSmartLearnPlan();
+  const highestPriorityIndex = plan.indexes[0];
+  const recommendedDeck = plan.weakDecks[0]
+    || (highestPriorityIndex !== undefined ? (cards[highestPriorityIndex].deck || "Ungrouped") : null);
+  if (!recommendedDeck) {
+    message.hidden = true;
+    return;
+  }
+  setName.textContent = recommendedDeck;
+  message.hidden = false;
+}
+
+function startSmartLearn() {
+  const plan = buildSmartLearnPlan();
+  if (!plan.indexes.length) return;
+  learnIsSmart = true;
+  learnSmartScores = plan.scores;
+  learnSmartHistory = plan.history;
+  learnSmartDeckNames = plan.decks;
+  learnSessionIndexes = plan.indexes;
+  learnMastery = new Map(learnSessionIndexes.map(index => [index, { status: "new", streak: 0 }]));
+  learnRetryIndexes = new Set();
+  learnRoundNumber = 0;
+  finishAnalyticsSession(activeLearnSessionId);
+  activeLearnSessionId = startAnalyticsSession("learn", {
+    selectedDecks: plan.decks,
+    mode: "smart-adaptive"
+  });
+  const learn = document.getElementById("learn");
+  learn.classList.remove("learn-picking", "learn-reviewing");
+  document.getElementById("learn-review").classList.remove("active");
+  showScreen("learn");
+  startLearnRound();
+}
+
+function learnGroupValues() {
+  return [...knownDecks(), ...(cards.some(card => !card.deck) ? [UNGROUPED_QUIZ_VALUE] : [])];
+}
+function updateLearnSelectAllLabel() {
+  const values = learnGroupValues();
+  document.getElementById("learn-select-all").textContent = values.length && values.every(value => selectedLearnGroups.has(value))
+    ? "Deselect all" : "Select all";
+}
+function renderLearnGroupPicker(selectAll = false) {
+  const values = learnGroupValues();
+  if (selectAll) selectedLearnGroups = new Set(values);
+  const list = document.getElementById("learn-group-list");
+  list.innerHTML = "";
+  values.forEach(value => {
+    const label = document.createElement("label");
+    label.className = "quiz-group-option";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox"; checkbox.value = value; checkbox.checked = selectedLearnGroups.has(value);
+    const name = document.createElement("span");
+    name.textContent = value === UNGROUPED_QUIZ_VALUE ? "Ungrouped" : value;
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) selectedLearnGroups.add(value); else selectedLearnGroups.delete(value);
+      updateLearnSelectAllLabel();
+    });
+    label.append(checkbox, name); list.appendChild(label);
+  });
+  updateLearnSelectAllLabel();
+}
+function openLearnPicker() {
+  learnIsSmart = false;
+  const learn = document.getElementById("learn");
+  learn.classList.add("learn-picking");
+  learn.classList.remove("learn-reviewing");
+  document.getElementById("learn-review").classList.remove("active");
+  document.getElementById("learn-progress").textContent = "";
+  document.getElementById("learn-instruction").textContent = "Set up Learn";
+  renderLearnGroupPicker(true);
+  showScreen("learn");
+}
+document.getElementById("btn-learn").addEventListener("click", openLearnPicker);
+document.getElementById("btn-smart-learn").addEventListener("click", startSmartLearn);
+document.getElementById("learn-exit").addEventListener("click", () => {
+  finishAnalyticsSession(activeLearnSessionId);
+  activeLearnSessionId = null;
+  showScreen("home");
+});
+document.getElementById("learn-select-all").addEventListener("click", () => {
+  const values = learnGroupValues();
+  const shouldSelectAll = !values.every(value => selectedLearnGroups.has(value));
+  selectedLearnGroups = shouldSelectAll ? new Set(values) : new Set();
+  renderLearnGroupPicker();
+});
+document.getElementById("learn-start").addEventListener("click", () => {
+  learnIsSmart = false;
+  learnSessionIndexes = cards.map((card, index) => ({ card, index }))
+    .filter(({ card }) => selectedLearnGroups.has(card.deck || UNGROUPED_QUIZ_VALUE))
+    .map(({ index }) => index);
+  if (learnSessionIndexes.length === 0) {
+    document.getElementById("learn-instruction").textContent = "Select at least one group to start.";
+    return;
+  }
+  finishAnalyticsSession(activeLearnSessionId);
+  activeLearnSessionId = startAnalyticsSession("learn", {
+    selectedDecks: [...selectedLearnGroups].map(value => value === UNGROUPED_QUIZ_VALUE ? "Ungrouped" : value),
+    mode: "adaptive"
+  });
+  learnMastery = new Map(learnSessionIndexes.map(index => [index, { status: "new", streak: 0 }]));
+  learnRetryIndexes = new Set();
+  learnRoundNumber = 0;
+  document.getElementById("learn").classList.remove("learn-picking", "learn-reviewing");
+  startLearnRound();
+});
+
+function shuffledValues(values) {
+  return shuffledIndexes(values.length).map(index => values[index]);
+}
+function orderedLearnValues(values) {
+  if (!learnIsSmart) return shuffledValues(values);
+  return [...values].sort((a, b) => (learnSmartScores.get(b) || 0) - (learnSmartScores.get(a) || 0));
+}
+function startLearnRound() {
+  const unmastered = learnSessionIndexes.filter(index => learnMastery.get(index).status !== "mastered");
+  if (unmastered.length === 0) { showLearnCompletion(); return; }
+  learnRoundNumber++;
+  learnRoundCorrect = 0;
+  learnQuestionIndex = 0;
+  const retry = orderedLearnValues(unmastered.filter(index => learnRetryIndexes.has(index)));
+  const familiar = orderedLearnValues(unmastered.filter(index => !learnRetryIndexes.has(index) && learnMastery.get(index).status === "familiar"));
+  const fresh = orderedLearnValues(unmastered.filter(index => learnMastery.get(index).status === "new"));
+  const selected = [];
+  const addUnique = index => { if (selected.length < LEARN_ROUND_SIZE && !selected.includes(index)) selected.push(index); };
+  const reservedFresh = learnRoundNumber > 1
+    ? Math.min(2, fresh.length, Math.max(0, LEARN_ROUND_SIZE - retry.length))
+    : 0;
+  const dueLimit = LEARN_ROUND_SIZE - reservedFresh;
+  retry.forEach(index => { if (selected.length < dueLimit) addUnique(index); });
+  familiar.forEach(index => { if (selected.length < dueLimit) addUnique(index); });
+  fresh.forEach(addUnique);
+  retry.forEach(addUnique);
+  familiar.forEach(addUnique);
+  learnRound = selected.map(index => ({
+    index,
+    type: learnRetryIndexes.has(index)
+      ? "choice"
+      : (learnMastery.get(index).streak >= 1 || (learnIsSmart && (learnSmartHistory.get(index) || 0) > 0) ? "write" : "choice")
+  }));
+  document.getElementById("learn").classList.remove("learn-reviewing");
+  document.getElementById("learn-review").classList.remove("active");
+  renderLearnProgress();
+  renderLearnQuestion();
+}
+function renderLearnProgress() {
+  const counts = { new: 0, familiar: 0, mastered: 0 };
+  learnMastery.forEach(value => counts[value.status]++);
+  document.getElementById("learn-count-new").textContent = counts.new;
+  document.getElementById("learn-count-familiar").textContent = counts.familiar;
+  document.getElementById("learn-count-mastered").textContent = counts.mastered;
+  const total = learnSessionIndexes.length || 1;
+  document.getElementById("learn-meter-familiar").style.width = `${counts.familiar / total * 100}%`;
+  document.getElementById("learn-meter-mastered").style.width = `${counts.mastered / total * 100}%`;
+  document.getElementById("learn-round-label").textContent = `${learnIsSmart ? "Smart · " : ""}Round ${learnRoundNumber}`;
+}
+function resetLearnQuestionUI() {
+  learnQuestionAnswered = false;
+  learnAnswerSC.clear();
+  document.getElementById("learn-answer-wrap").style.display = "none";
+  document.getElementById("learn-compare").classList.remove("active");
+  document.getElementById("learn-choices").classList.remove("active");
+  document.getElementById("learn-toolbar").style.display = "none";
+  document.getElementById("learn-actions-write").style.display = "none";
+  document.getElementById("learn-actions-grade").style.display = "none";
+  document.getElementById("learn-actions-next").style.display = "none";
+  document.getElementById("learn-feedback").textContent = "";
+}
+function renderLearnQuestion() {
+  resetLearnQuestionUI();
+  const question = learnRound[learnQuestionIndex];
+  const card = cards[question.index];
+  learnFrontSC.loadStrokes(card.front_strokes);
+  document.getElementById("learn-progress").textContent = `${learnQuestionIndex + 1} / ${learnRound.length}`;
+  if (question.type === "choice") {
+    learnWriteReadyAt = 0;
+    document.getElementById("learn-instruction").textContent = "Choose the matching answer";
+    renderLearnChoices(question.index);
+  } else {
+    learnWriteReadyAt = Date.now() + 5000;
+    document.getElementById("learn-instruction").textContent = "Handwrite the answer from memory";
+    document.getElementById("learn-answer-wrap").style.display = "";
+    document.getElementById("learn-toolbar").style.display = "";
+    document.getElementById("learn-actions-write").style.display = "";
+  }
+  animateCardChange(learnFrontSC.canvas);
+}
+function renderLearnChoices(answerIndex) {
+  const requestedDistractors = Math.min(3, learnSessionIndexes.length - 1);
+  const card = cards[answerIndex];
+  const sameDeck = learnSessionIndexes.filter(index => index !== answerIndex && (cards[index].deck || null) === (card.deck || null));
+  const otherDeck = learnSessionIndexes.filter(index => index !== answerIndex && (cards[index].deck || null) !== (card.deck || null));
+  const distractors = shuffledValues(sameDeck).slice(0, requestedDistractors);
+  shuffledValues(otherDeck).forEach(index => {
+    if (distractors.length < requestedDistractors) distractors.push(index);
+  });
+  const choices = shuffledValues([answerIndex, ...distractors]);
+  const wrap = document.getElementById("learn-choices");
+  wrap.innerHTML = ""; wrap.classList.add("active");
+  choices.forEach(index => {
+    const button = document.createElement("button");
+    button.className = "choice-card"; button.setAttribute("aria-label", "Answer choice");
+    const canvas = document.createElement("canvas"); button.appendChild(canvas); wrap.appendChild(button);
+    drawMiniCard(canvas, cards[index].back_strokes);
+    button.addEventListener("click", () => {
+      if (learnQuestionAnswered) return;
+      const correct = index === answerIndex;
+      button.classList.add(correct ? "correct" : "incorrect");
+      wrap.querySelectorAll("button").forEach(candidate => {
+        candidate.disabled = true;
+        if (candidate._cardIndex === answerIndex) candidate.classList.add("correct");
+      });
+      submitLearnAnswer(correct);
+    });
+    button._cardIndex = index;
+  });
+}
+function submitLearnAnswer(correct) {
+  if (learnQuestionAnswered) return;
+  learnQuestionAnswered = true;
+  const question = learnRound[learnQuestionIndex];
+  recordAnalyticsAttempt(activeLearnSessionId, "learn", question.index, question.type, correct);
+  if (learnIsSmart) {
+    const currentPriority = learnSmartScores.get(question.index) || 0;
+    learnSmartScores.set(question.index, Math.max(0, currentPriority + (correct ? -0.08 : 0.50)));
+    learnSmartHistory.set(question.index, (learnSmartHistory.get(question.index) || 0) + 1);
+  }
+  const mastery = learnMastery.get(question.index);
+  if (correct) {
+    mastery.streak++;
+    if (question.type === "write" && mastery.streak >= 2) mastery.status = "mastered";
+    else mastery.status = "familiar";
+    learnRetryIndexes.delete(question.index);
+    learnRoundCorrect++;
+    playCorrectSound();
+  } else {
+    mastery.streak = 0;
+    learnRetryIndexes.add(question.index);
+    playWrongSound();
+  }
+  renderLearnProgress();
+  document.getElementById("learn-feedback").textContent = correct
+    ? (mastery.status === "mastered" ? "Mastered!" : (question.type === "write" ? "Correct · one more recall to master" : "Correct · handwriting comes next"))
+    : (learnIsSmart ? "Not quite · moved up in your Smart Learn queue" : "Not quite · this card will come back");
+  document.getElementById("learn-actions-grade").style.display = "none";
+  document.getElementById("learn-actions-next").style.display = "";
+}
+document.getElementById("learn-clear").addEventListener("click", () => learnAnswerSC.clear());
+document.getElementById("learn-reveal").addEventListener("click", () => {
+  if (learnQuestionAnswered) return;
+  if (writeAnswerIsLocked(learnWriteReadyAt)) return;
+  const question = learnRound[learnQuestionIndex];
+  document.getElementById("learn-answer-wrap").style.display = "none";
+  document.getElementById("learn-toolbar").style.display = "none";
+  document.getElementById("learn-actions-write").style.display = "none";
+  document.getElementById("learn-compare").classList.add("active");
+  learnYourSC.loadStrokes(learnAnswerSC.getStrokes());
+  learnRealSC.loadStrokes(cards[question.index].back_strokes);
+  document.getElementById("learn-actions-grade").style.display = "";
+  document.getElementById("learn-instruction").textContent = "Compare and grade your answer";
+  animateCardChange(learnRealSC.canvas);
+});
+document.getElementById("learn-mark-right").addEventListener("click", () => submitLearnAnswer(true));
+document.getElementById("learn-mark-wrong").addEventListener("click", () => submitLearnAnswer(false));
+document.getElementById("learn-next").addEventListener("click", () => {
+  learnQuestionIndex++;
+  if (learnQuestionIndex >= learnRound.length) showLearnRoundReview(); else renderLearnQuestion();
+});
+function showLearnRoundReview() {
+  const total = learnRound.length;
+  const percent = Math.round(learnRoundCorrect / total * 100);
+  const mastered = [...learnMastery.values()].filter(value => value.status === "mastered").length;
+  const complete = mastered === learnSessionIndexes.length;
+  const review = document.getElementById("learn-review");
+  const title = complete
+    ? (learnIsSmart ? "Priority cards mastered!" : "You mastered every card!")
+    : `${learnIsSmart ? "Smart " : ""}Round ${learnRoundNumber} complete`;
+  const summaryText = complete
+    ? (learnIsSmart ? "Smart Learn will use your new results the next time you start it." : "Your Learn session is complete.")
+    : (learnIsSmart ? "Missed cards move up next round; correct recalls gradually move out." : "Your next round will revisit misses and move familiar cards to handwriting.");
+  review.innerHTML = `<div class="quiz-summary-card">${complete ? '<div class="confetti">🎉 ✨ 🎉</div>' : ""}<h2>${title}</h2><p>${summaryText}</p><div class="learn-review-stats"><div class="learn-review-stat"><strong>${percent}%</strong><span>accuracy</span></div><div class="learn-review-stat"><strong>${mastered}/${learnSessionIndexes.length}</strong><span>mastered</span></div></div><div class="quiz-summary-actions">${complete ? '<button class="primary" id="learn-finish">Finish</button><button id="learn-restart">Learn again</button>' : '<button class="primary" id="learn-continue-round">Continue to next round</button><button id="learn-finish">Finish for now</button>'}</div></div>`;
+  document.getElementById("learn").classList.add("learn-reviewing");
+  review.classList.add("active");
+  document.getElementById("learn-progress").textContent = "";
+  document.getElementById("learn-instruction").textContent = complete ? "Session complete" : (learnIsSmart ? "Smart review" : "Round review");
+  if (complete) playFinishedSound();
+  const continueButton = document.getElementById("learn-continue-round");
+  if (continueButton) continueButton.addEventListener("click", startLearnRound);
+  document.getElementById("learn-finish").addEventListener("click", () => {
+    finishAnalyticsSession(activeLearnSessionId);
+    activeLearnSessionId = null;
+    showScreen("home");
+  });
+  const restartButton = document.getElementById("learn-restart");
+  if (restartButton) restartButton.addEventListener("click", () => {
+    finishAnalyticsSession(activeLearnSessionId);
+    activeLearnSessionId = startAnalyticsSession("learn", {
+      selectedDecks: learnIsSmart
+        ? learnSmartDeckNames
+        : [...selectedLearnGroups].map(value => value === UNGROUPED_QUIZ_VALUE ? "Ungrouped" : value),
+      mode: learnIsSmart ? "smart-adaptive-restart" : "adaptive-restart"
+    });
+    learnMastery = new Map(learnSessionIndexes.map(index => [index, { status: "new", streak: 0 }]));
+    learnRetryIndexes = new Set(); learnRoundNumber = 0; startLearnRound();
+  });
+}
+function showLearnCompletion() {
+  showLearnRoundReview();
+}
+
+// ---- Insights ----
+document.getElementById("btn-insights").addEventListener("click", () => {
+  renderInsights();
+  showScreen("insights");
+});
+document.getElementById("insights-back").addEventListener("click", () => showScreen("home"));
+
+function groupedAttemptStats(attempts, keyFor) {
+  const grouped = new Map();
+  attempts.forEach(attempt => {
+    const key = keyFor(attempt);
+    const stat = grouped.get(key) || { key, attempts: 0, correct: 0 };
+    stat.attempts++;
+    if (attempt.correct) stat.correct++;
+    grouped.set(key, stat);
+  });
+  return [...grouped.values()].map(stat => ({
+    ...stat,
+    accuracy: Math.round(stat.correct / stat.attempts * 100)
+  }));
+}
+function appendAccuracyRows(container, stats, emptyMessage) {
+  if (!stats.length) {
+    container.innerHTML = `<div class="insight-empty">${emptyMessage}</div>`;
+    return;
+  }
+  stats.forEach(stat => {
+    const row = document.createElement("div");
+    row.className = "deck-row";
+    const name = document.createElement("div");
+    name.className = "deck-name";
+    name.textContent = stat.key;
+    const track = document.createElement("div");
+    track.className = "accuracy-track";
+    const fill = document.createElement("span");
+    fill.style.width = `${stat.accuracy}%`;
+    track.appendChild(fill);
+    const score = document.createElement("div");
+    score.className = "deck-score";
+    score.textContent = `${stat.accuracy}% · ${stat.attempts}`;
+    row.append(name, track, score);
+    container.appendChild(row);
+  });
+}
+function renderActivityChart(container, attempts) {
+  const daily = new Map();
+  attempts.forEach(attempt => {
+    const key = localDayKey(attempt.at);
+    const stat = daily.get(key) || { right: 0, wrong: 0 };
+    if (attempt.correct) stat.right++; else stat.wrong++;
+    daily.set(key, stat);
+  });
+  const days = Array.from({ length: 14 }, (_, offset) => {
+    const date = dayStart(13 - offset);
+    return { date, stat: daily.get(localDayKey(date)) || { right: 0, wrong: 0 } };
+  });
+  const max = Math.max(1, ...days.map(day => day.stat.right + day.stat.wrong));
+  days.forEach(({ date, stat }) => {
+    const total = stat.right + stat.wrong;
+    const day = document.createElement("div");
+    day.className = "activity-day";
+    day.title = `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}: ${total} answer${total === 1 ? "" : "s"}`;
+    const bars = document.createElement("div");
+    bars.className = "activity-bars";
+    const right = document.createElement("span");
+    right.className = "right";
+    right.style.height = `${stat.right / max * 88}px`;
+    const wrong = document.createElement("span");
+    wrong.className = "wrong";
+    wrong.style.height = `${stat.wrong / max * 88}px`;
+    bars.append(right, wrong);
+    const label = document.createElement("label");
+    label.textContent = `${date.getMonth() + 1}/${date.getDate()}`;
+    day.append(bars, label);
+    container.appendChild(day);
+  });
+}
+function renderInsights() {
+  const content = document.getElementById("insights-content");
+  const attempts = analyticsData.attempts.filter(attempt => !Number.isNaN(new Date(attempt.at).getTime()));
+  const sessions = analyticsData.sessions.filter(session => session.attempts > 0);
+  const recentStart = dayStart(6);
+  const previousStart = dayStart(13);
+  const recentAttempts = attempts.filter(attempt => new Date(attempt.at) >= recentStart);
+  const previousAttempts = attempts.filter(attempt => {
+    const date = new Date(attempt.at);
+    return date >= previousStart && date < recentStart;
+  });
+  const overallAccuracy = accuracyFor(attempts);
+  const recentAccuracy = accuracyFor(recentAttempts);
+  const previousAccuracy = accuracyFor(previousAttempts);
+  const streak = calculatePracticeStreak(attempts);
+  const practicedCards = new Set(attempts.map(attempt => attempt.cardId)).size;
+
+  content.innerHTML = `
+    <div class="insights-grid">
+      <div class="insight-stat"><strong>${overallAccuracy === null ? "—" : `${overallAccuracy}%`}</strong><span>all-time accuracy</span></div>
+      <div class="insight-stat"><strong>${attempts.length}</strong><span>answers graded</span></div>
+      <div class="insight-stat"><strong>${sessions.length}</strong><span>practice sessions</span></div>
+      <div class="insight-stat"><strong>${streak}</strong><span>day streak</span></div>
+    </div>
+    <div class="insight-callout" id="insight-callout"></div>
+    <section class="insight-section">
+      <div class="insight-section-head"><h2>Last 14 days</h2><span class="insight-note">green = right · rose = missed</span></div>
+      <div class="activity-chart" id="insight-activity"></div>
+    </section>
+    <section class="insight-section">
+      <div class="insight-section-head"><h2>Sets to focus on</h2><span class="insight-note">accuracy · answers</span></div>
+      <div id="insight-decks"></div>
+    </section>
+    <section class="insight-section">
+      <div class="insight-section-head"><h2>Most-missed questions</h2><span class="insight-note">ranked by misses</span></div>
+      <div class="trouble-list" id="insight-trouble"></div>
+    </section>
+    <section class="insight-section">
+      <div class="insight-section-head"><h2>Answer formats</h2><span class="insight-note">accuracy · answers</span></div>
+      <div id="insight-modes"></div>
+    </section>`;
+
+  const deckStats = groupedAttemptStats(attempts, attempt => attempt.deck || "Ungrouped")
+    .sort((a, b) => a.accuracy - b.accuracy || b.attempts - a.attempts || a.key.localeCompare(b.key));
+  appendAccuracyRows(document.getElementById("insight-decks"), deckStats, "Complete a Learn or Quiz session to compare your sets.");
+
+  const modeNames = { write: "Written recall", choice: "Multiple choice", truefalse: "True / false", match: "Matching" };
+  const modeStats = groupedAttemptStats(attempts, attempt => modeNames[attempt.mode] || attempt.mode || "Other")
+    .sort((a, b) => a.accuracy - b.accuracy || b.attempts - a.attempts);
+  appendAccuracyRows(document.getElementById("insight-modes"), modeStats, "Your accuracy by question type will appear here.");
+  renderActivityChart(document.getElementById("insight-activity"), attempts);
+
+  const cardStats = groupedAttemptStats(attempts, attempt => attempt.cardId).map(stat => ({
+    ...stat,
+    misses: stat.attempts - stat.correct,
+    card: cards.find(card => String(card.id) === stat.key)
+  })).filter(stat => stat.card && stat.misses > 0)
+    .sort((a, b) => b.misses - a.misses || a.accuracy - b.accuracy || b.attempts - a.attempts)
+    .slice(0, 8);
+  const trouble = document.getElementById("insight-trouble");
+  if (!cardStats.length) {
+    trouble.innerHTML = `<div class="insight-empty">No missed questions yet. Your toughest cards will appear here.</div>`;
+  } else {
+    cardStats.forEach(stat => {
+      const row = document.createElement("div");
+      row.className = "trouble-card";
+      const canvas = document.createElement("canvas");
+      const detail = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = stat.card.deck || "Ungrouped";
+      const meta = document.createElement("span");
+      meta.textContent = `${stat.misses} missed · ${stat.correct} right · ${stat.attempts} total`;
+      detail.append(title, meta);
+      const rate = document.createElement("div");
+      rate.className = "trouble-rate";
+      rate.innerHTML = `${100 - stat.accuracy}%<small>miss rate</small>`;
+      row.append(canvas, detail, rate);
+      trouble.appendChild(row);
+      drawMiniCard(canvas, stat.card.front_strokes);
+    });
+  }
+
+  let message = "Start a Learn or Quiz session and your patterns will show up here.";
+  if (attempts.length) {
+    const trend = recentAccuracy !== null && previousAccuracy !== null ? recentAccuracy - previousAccuracy : null;
+    const worstDeck = deckStats.find(stat => stat.attempts >= 3) || deckStats[0];
+    const trendText = trend === null ? "" : trend > 0 ? ` Your 7-day accuracy is up ${trend} points.` : trend < 0 ? ` Your 7-day accuracy is down ${Math.abs(trend)} points.` : " Your 7-day accuracy is holding steady.";
+    message = `${practicedCards} card${practicedCards === 1 ? "" : "s"} practiced.${trendText}`;
+    if (worstDeck) message += ` Focus next on ${worstDeck.key} (${worstDeck.accuracy}% accuracy).`;
+  }
+  document.getElementById("insight-callout").textContent = message;
+}
+
+// ---- Manage flow ----
+document.getElementById("btn-manage").addEventListener("click", () => {
+  renderManage();
+  showScreen("manage");
+});
+document.getElementById("manage-back").addEventListener("click", () => showScreen("home"));
+function renderManageGroups() {
+  const groups = document.getElementById("manage-groups");
+  groups.innerHTML = `<span class="tag-label">Groups</span><button class="tag-chip" id="manage-new-group">+ New</button>`;
+  knownDecks().forEach(deck => {
+    const button = document.createElement("button");
+    button.className = "tag-chip"; button.textContent = deck; groups.appendChild(button);
+    button.addEventListener("click", () => openAddCard(deck));
+  });
+  groups.querySelector("#manage-new-group").addEventListener("click", () => {
+    const deck = window.prompt("Name this group (for example, Set 1 or 9/2/26):");
+    const trimmedDeck = deck && deck.trim();
+    if (trimmedDeck) openAddCard(trimmedDeck);
+  });
+}
+function renderManage() {
+  renderManageGroups();
+  const list = document.getElementById("manage-list");
+  list.innerHTML = "";
+  if (cards.length === 0) {
+    list.innerHTML = `<div class="empty-msg">No cards yet.</div>`;
+    return;
+  }
+  cards.forEach(card => {
+    const row = document.createElement("div");
+    row.className = "manage-row";
+    row.innerHTML = `<canvas></canvas><button class="del">Delete</button>`;
+    const groupSelect = document.createElement("select");
+    groupSelect.className = "card-group-select";
+    groupSelect.setAttribute("aria-label", "Card group");
+    const noGroup = document.createElement("option");
+    noGroup.value = ""; noGroup.textContent = "No group"; groupSelect.appendChild(noGroup);
+    knownDecks().forEach(deck => {
+      const option = document.createElement("option");
+      option.value = deck; option.textContent = deck;
+      option.selected = deck === card.deck; groupSelect.appendChild(option);
+    });
+    groupSelect.value = card.deck || "";
+    row.querySelector(".del").before(groupSelect);
+    groupSelect.addEventListener("change", async () => {
+      const previousDeck = card.deck || "";
+      groupSelect.disabled = true;
+      try {
+        await updateCardDeck(card.id, groupSelect.value);
+        await refreshCards();
+        renderManage();
+      } catch (err) {
+        groupSelect.value = previousDeck;
+        groupSelect.disabled = false;
+        setStatus(err.message, true);
+      }
+    });
+    list.appendChild(row);
+    const canvasEl = row.querySelector("canvas");
+    const wrapDiv = document.createElement("div");
+    // mini renderer without ResizeObserver churn: just draw directly
+    requestAnimationFrame(() => {
+      const rect = canvasEl.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvasEl.width = rect.width * dpr;
+      canvasEl.height = rect.height * dpr;
+      const ctx = canvasEl.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.strokeStyle = "#1F2421";
+      ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 1.6;
+      (card.front_strokes || []).forEach(s => {
+        if (!s.points || s.points.length === 0) return;
+        if (s.points.length === 1) {
+          ctx.beginPath();
+          ctx.arc(s.points[0].x * rect.width, s.points[0].y * rect.height, ctx.lineWidth / 2, 0, Math.PI * 2);
+          ctx.fillStyle = "#1F2421"; ctx.fill();
+          return;
+        }
+        ctx.beginPath();
+        ctx.moveTo(s.points[0].x * rect.width, s.points[0].y * rect.height);
+        s.points.forEach(p => ctx.lineTo(p.x * rect.width, p.y * rect.height));
+        ctx.stroke();
+      });
+    });
+    row.querySelector(".del").addEventListener("click", async () => {
+      row.style.opacity = "0.4";
+      try {
+        await deleteCard(card.id);
+        await refreshCards();
+        renderManage();
+      } catch (err) {
+        setStatus(err.message, true);
+        row.style.opacity = "1";
+      }
+    });
+  });
+}
+
+// ---- Init ----
+// ---- Diagnostic-only pointer counter (does NOT affect drawing logic) ----
+// Purely observational: tallies every pointer event reaching the add canvas,
+// broken down by pointerType, so we can tell whether a missed stroke never
+// generated any event (OS-level drop) or generated a "touch"-typed event
+// that our normal drawing code is correctly-but-wrongly filtering out
+// (misclassification, not a drop).
+const debugCounts = {};
+let debugRenderQueued = false;
+function bumpCount(type, kind) {
+  debugCounts[type] = debugCounts[type] || { down: 0, move: 0, up: 0 };
+  debugCounts[type][kind]++;
+  // Do not force a DOM update for every high-frequency pointer sample.
+  if (!debugRenderQueued) {
+    debugRenderQueued = true;
+    requestAnimationFrame(() => {
+      debugRenderQueued = false;
+      renderDebugCounts();
+    });
+  }
+}
+function renderDebugCounts() {
+  const parts = Object.keys(debugCounts).map(t => {
+    const c = debugCounts[t];
+    return `${t}: down ${c.down} / move ${c.move} / up ${c.up}`;
+  });
+  document.getElementById("add-debug-counts").textContent = parts.length ? parts.join("   |   ") : "counts: (none yet)";
+}
+document.getElementById("reset-debug-counts").addEventListener("click", () => {
+  Object.keys(debugCounts).forEach(k => delete debugCounts[k]);
+  renderDebugCounts();
+});
+addCanvasEl.addEventListener("pointerdown", (e) => bumpCount(e.pointerType || "unknown", "down"), { capture: true });
+addCanvasEl.addEventListener("pointermove", (e) => bumpCount(e.pointerType || "unknown", "move"), { capture: true });
+window.addEventListener("pointerup", (e) => bumpCount(e.pointerType || "unknown", "up"), { capture: true });
+addCanvasEl.addEventListener("touchstart", (e) => {
+  if ([...e.changedTouches].some(touch => touch.touchType === "stylus")) bumpCount("stylus-touch", "down");
+}, { capture: true, passive: true });
+addCanvasEl.addEventListener("touchmove", (e) => {
+  if ([...e.changedTouches].some(touch => touch.touchType === "stylus")) bumpCount("stylus-touch", "move");
+}, { capture: true, passive: true });
+window.addEventListener("touchend", (e) => {
+  if ([...e.changedTouches].some(touch => touch.touchType === "stylus")) bumpCount("stylus-touch", "up");
+}, { capture: true, passive: true });
+renderDebugCounts();
+
+refreshCards(true);
+syncAnalytics();
+syncDiagnosticStatus();
+window.addEventListener("pagehide", () => {
+  finishAnalyticsSession(activeQuizSessionId);
+  finishAnalyticsSession(activeLearnSessionId);
+});
+</script>
+</body>
+</html>

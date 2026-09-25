@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <meta name="theme-color" content="#f8f9f6">
+  <meta name="description" content="An infinite whiteboard for drawing together on your local network.">
+  <title>Field — local whiteboard</title>
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+  <script src="model.js" defer></script>
+  <script src="vocab-pen.js" defer></script>
+  <script src="cache.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <canvas id="board" aria-label="Infinite drawing canvas. Use a pen or mouse to draw, and the hand tool to pan."></canvas>
+  <header id="main-controls" class="panel topbar">
+    <a class="brand" href="/" aria-label="Field home"><span class="brand-icon">✳</span> field<span class="divider"></span></a>
+    <input id="title" aria-label="Board name" value="Untitled board" maxlength="80">
+    <span id="save" class="muted">Connecting…</span>
+    <a id="new-board" class="new-board" target="_blank" rel="noopener" aria-label="New board (opens in a new tab)">+ New board</a>
+    <button id="export" class="download-button" title="Download or open a board">↓ Download</button>
+    <button id="share" class="primary">↗ <span>Share board</span></button>
+  </header>
+  <aside class="panel tools" aria-label="Drawing tools">
+    <button data-tool="pen" class="selected" title="Pen (P)" aria-label="Pen" aria-pressed="true">✎</button>
+    <button data-tool="text" title="Text box (T): click to add or edit, drag to move" aria-label="Text box" aria-pressed="false">T</button>
+    <button id="insert-image" title="Insert image" aria-label="Insert image">▧</button>
+    <button data-tool="select" title="Select: click images to resize, drag images or text to move" aria-label="Select images and text" aria-pressed="false">↖</button>
+    <button data-tool="eraser" title="Stroke eraser (E)" aria-label="Stroke eraser" aria-pressed="false">▱</button>
+    <button data-tool="hand" title="Pan (H), or hold Space" aria-label="Pan" aria-pressed="false">✋</button>
+    <div class="rule"></div>
+    <div id="colors" aria-label="Ink color"></div>
+    <label class="custom-color" title="Custom ink color"><input type="color" id="color" value="#263b36" aria-label="Custom ink color"></label>
+    <div class="rule"></div>
+    <button id="width" title="Change stroke width" aria-label="Stroke width: 3">●<small>3</small></button>
+  </aside>
+  <div class="view-controls panel"><button id="focus" title="Move your followers to a point" aria-label="Focus followers" aria-pressed="false" hidden>Focus</button><button id="re-zoom" title="One-time zoom for followers" aria-label="Re-Zoom followers" hidden>Re-Zoom</button><button id="compact-mode" title="Toggle compact mode" aria-label="Compact mode" aria-pressed="false">Compact</button><button id="view-settings" title="Choose which menus to hide" aria-label="View settings">⚙</button></div>
+  <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+  <button id="reveal-controls" class="panel" aria-label="Show controls" aria-expanded="false" aria-controls="main-controls page-controls bottom-controls" hidden>&gt;</button>
+  <div id="empty"><span class="empty-mark">✳</span><h1>Room for every idea.</h1><p>Pick up your pen. Make a start.</p><span class="empty-hint">An infinite canvas, shared locally.</span></div>
+  <nav id="page-controls" class="panel page-nav" aria-label="Document pages">
+    <button id="pages-menu" aria-label="Open page menu" title="All pages">☰</button>
+    <button id="previous-page" aria-label="Previous page" title="Previous page (Left arrow)">‹</button>
+    <span id="page-number">1 / 1</span>
+    <button id="next-page" aria-label="Next page" title="Next page (Right arrow)">›</button>
+    <button id="add-page" aria-label="Add page" title="Add a blank page">+</button>
+    <span class="divider"></span><button id="auto-follow" aria-pressed="false" title="Choose a person to follow">Follow</button>
+  </nav>
+  <footer id="bottom-controls">
+    <div class="panel history"><button id="undo" title="Undo (⌘/Ctrl Z)" aria-label="Undo" disabled>↶</button><button id="redo" title="Redo (⌘/Ctrl Shift Z)" aria-label="Redo" disabled>↷</button></div>
+    <div class="status"><span id="dot"></span><span id="status" role="status">Connecting locally</span></div>
+    <div class="panel zoom"><button id="auto-fit" aria-pressed="false" title="Automatically keep all writing visible on this device">Auto-fit</button><span class="divider"></span><button id="out" aria-label="Zoom out">−</button><button id="zoom" title="Reset zoom">100%</button><button id="in" aria-label="Zoom in">+</button><span class="divider"></span><button id="fit" title="Fit drawing (F)" aria-label="Fit drawing">⛶</button></div>
+  </footer>
+  <div class="hint">Space + drag to pan <span>·</span> Scroll to zoom <span>·</span> Palm rejection on</div>
+  <dialog id="share-dialog">
+    <form method="dialog"><button class="close" aria-label="Close">×</button></form>
+    <span class="eyebrow">BETTER TOGETHER</span><h2>Same Wi-Fi. Same canvas.</h2>
+    <p>Open this link on another device connected to your local network. Anyone with the link can edit.</p>
+    <div class="join-qr"><img id="join-qr" width="240" height="240" alt="Scan to join this document" hidden><p id="qr-status">Preparing join code…</p></div>
+    <label for="join-address" id="join-address-label" hidden>Network address</label><select id="join-address" hidden></select>
+    <label for="link">Board link</label><div class="link-row"><input id="link" readonly><button id="copy" class="primary">Copy</button></div>
+    <p class="small">Keep this computer and the local server running. Edits stay on this network; no account or cloud service is needed.</p>
+    <div id="peers"></div>
+  </dialog>
+  <dialog id="download-dialog">
+    <form method="dialog"><button class="close" aria-label="Close">×</button></form>
+    <span class="eyebrow">TAKE YOUR IDEAS WITH YOU</span><h2>Download your document.</h2>
+    <p>Save every page, including writing outside the current view.</p>
+    <div class="download-options">
+      <button id="download-board"><strong>Editable document <span>↓</span></strong><small>All pages and text boxes as .field.json.</small></button>
+      <button id="download-pptx"><strong>PowerPoint slideshow <span>↓</span></strong><small>Every page as a slide, with its layout preserved.</small></button>
+      <button id="download-pdf"><strong>PDF document <span>↓</span></strong><small>Every whiteboard page on its own PDF page.</small></button>
+      <button id="download-png"><strong>Current page · PNG <span>↓</span></strong><small>A picture for sharing or printing.</small></button>
+      <button id="download-svg"><strong>Current page · SVG <span>↓</span></strong><small>Keep lines crisp at any size.</small></button>
+    </div>
+    <button id="open-board" class="primary">Open a saved board…</button>
+    <button id="import-pptx" class="primary">Import PowerPoint…</button>
+    <input id="pptx-file" type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
+    <p id="import-report" class="small" role="status"></p>
+    <input id="board-file" type="file" accept=".json,.field.json,application/json" hidden>
+    <p class="small">PDF and PowerPoint contain page images. Use .field.json to keep individual text boxes and strokes editable. Opening a document adds its pages for everyone; you can undo the import.</p>
+  </dialog>
+  <dialog id="pages-dialog">
+    <form method="dialog"><button class="close" aria-label="Close">×</button></form>
+    <span class="eyebrow">YOUR DOCUMENT</span><h2>Pages</h2>
+    <p>Jump to a page. Your selection doesn’t move anyone else’s view.</p>
+    <div id="page-list"></div>
+    <label for="page-background">Current page background</label><input id="page-background" type="color" value="#f8f9f6">
+    <button id="menu-add-page" class="primary">+ Add page</button>
+  </dialog>
+  <dialog id="follow-dialog">
+    <form method="dialog"><button class="close" aria-label="Close follow settings">×</button></form>
+    <span class="eyebrow">STAY WITH THE WRITER</span><h2>Auto-follow</h2>
+    <p>Choose whether to track someone’s pointer, their current page, or both. Pointer following zooms out to include the page, then follows the writer when fitting everything would make it too small.</p>
+    <label for="your-name">Your display name</label><input id="your-name" maxlength="40" placeholder="Your name">
+    <label for="follow-person">Follow a person</label><select id="follow-person"></select>
+    <label class="checkbox-label"><input id="follow-zoom" type="checkbox"> Follow their zoom</label>
+    <p class="small">Use their exact zoom level instead of automatic follow zoom or Auto-fit.</p>
+    <label for="follow-mode">Follow mode</label><select id="follow-mode"><option value="both">Pointer and page</option><option value="pointer">Pointer only (current page)</option><option value="slide">Page number only</option></select>
+    <p id="follow-status" class="small" role="status">Choose someone who has joined this document.</p>
+    <div class="text-actions"><button id="stop-follow">Stop following</button><button id="start-follow" class="primary">Start following</button></div>
+    <p class="small">Pointer-only mode stays on your page. Page-only mode switches pages without tracking the pointer. You can also enable Auto-fit to fit each page. Drawing pauses following until you lift your pen. Manual navigation stops following.</p>
+  </dialog>
+  <dialog id="text-dialog">
+    <form method="dialog"><button class="close" aria-label="Cancel text editing">×</button></form>
+    <h2>Text box</h2>
+    <label for="text-content">Text</label>
+    <div class="format-toolbar" aria-label="Text formatting"><button id="text-bold" type="button" title="Bold selected text" aria-label="Bold selected text"><strong>B</strong></button><button id="text-italic" type="button" title="Italicize selected text" aria-label="Italicize selected text"><em>I</em></button><span>Select words, then choose a style.</span></div>
+    <textarea id="text-content" rows="5" maxlength="10000" placeholder="Type your idea…"></textarea>
+    <div id="text-preview" aria-label="Formatted text preview"></div>
+    <div class="text-settings">
+      <label>Text color<input id="text-color" type="color" value="#263b36"></label>
+      <label>Box color<input id="text-background" type="color" value="#edf3df"></label>
+      <label>Font size<input id="text-size" type="number" min="12" max="144" value="28"></label>
+      <label>Box width<input id="text-width" type="number" min="80" max="2000" value="320"></label>
+    </div>
+    <label class="checkbox-label"><input id="text-transparent" type="checkbox"> No background</label>
+    <div class="text-actions"><button id="text-delete">Delete box</button><button id="text-save" class="primary">Save text</button></div>
+    <p class="small">With the Text tool selected, click a box to edit or drag it to move.</p>
+  </dialog>
+  <dialog id="image-dialog">
+    <form method="dialog"><button class="close" aria-label="Close image settings">×</button></form>
+    <h2>Image</h2><img id="image-preview" alt="Selected image">
+    <label for="image-width">Width (aspect ratio is preserved)</label><input id="image-width" type="number" min="1" max="20000">
+    <div class="text-actions"><button id="image-delete">Delete</button><button id="image-save" class="primary">Save size</button></div>
+    <p class="small">Use the Select tool to drag images to another position.</p>
+  </dialog>
+  <dialog id="view-dialog">
+    <form method="dialog"><button class="close" aria-label="Close view settings">×</button></form>
+    <h2>Compact settings</h2><p>Choose what disappears in compact mode. The arrow reveals these menus again.</p>
+    <label class="checkbox-label"><input id="compact-header" type="checkbox"> Document toolbar</label>
+    <label class="checkbox-label"><input id="compact-pages" type="checkbox"> Page navigation</label>
+    <label class="checkbox-label"><input id="compact-palette" type="checkbox"> Pen palette</label>
+    <label class="checkbox-label"><input id="compact-bottom" type="checkbox"> Undo, status, and zoom</label>
+    <label class="checkbox-label"><input id="compact-hints" type="checkbox"> Hints and empty-page message</label>
+    <p class="small">Saved on this device. Compact controls always remain visible.</p>
+  </dialog>
+  <div id="toast" role="status"></div>
+</body>
+</html>
