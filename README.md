@@ -1,5 +1,6 @@
 # Field — infinite local whiteboard
 
+The creation of this app was assisted by ChatGPT.
 Plain HTML, CSS, and browser JavaScript, with a Node.js LAN server. PDFKit and PptxGenJS generate downloadable documents locally; the browser has no framework or remote dependencies.
 
 ## Run
